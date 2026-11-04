@@ -1,0 +1,10 @@
+# Build directories
+/build/
+/build-*/
+/cmake-build-*/
+
+# IDE (CLion); the CMake files are the project definition
+/.idea/
+
+# Simulation output
+/output/

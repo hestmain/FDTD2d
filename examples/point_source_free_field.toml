@@ -1,0 +1,43 @@
+# Harmonic point source radiating into a free field.
+# All four sides are absorbing (PML), so the outgoing cylindrical wave
+# leaves the domain with very little reflection.
+#
+# Run:  fdtd2d examples/point_source_free_field.toml
+# Frames are written to out/point_source_free_field/p_XXXXXX.png
+
+[simulation]
+duration = 0.004          # [s] simulated time
+cfl      = 0.7            # Courant number, 0 < cfl <= 1 (dt is derived)
+
+[grid]
+x_range = [0.0, 2.0]      # [m] physical domain (PML is added outside)
+y_range = [0.0, 1.5]      # [m]
+dx      = 0.005           # [m] cell size; dy defaults to dx
+
+[medium]                  # air at about 20 C
+density = 1.21            # [kg/m^3]
+c       = 343.0           # [m/s]
+
+[boundary]
+x_min = "pml"
+x_max = "pml"
+y_min = "pml"
+y_max = "pml"
+
+[boundary.pml]
+thickness  = 20           # [cells]
+reflection = 1e-6         # theoretical normal-incidence reflection
+order      = 2            # polynomial grading of the damping profile
+
+[[source]]
+# Point source: amplitude is the volume velocity per unit depth Q [m^2/s].
+# Q = 2e-3 m^2/s at 2 kHz gives roughly 1 Pa amplitude at 1 m.
+shape  = { type = "point", position = [0.6, 0.75] }
+signal = { type = "harmonic", frequency = 2000.0, amplitude = 2e-3, phase = 0.0, ramp_cycles = 3 }
+
+[output]
+directory   = "out/point_source_free_field"
+every       = 10          # write a frame every 10 time steps
+color_limit = 1.0         # [Pa] fixed symmetric colour scale; or "auto"
+pixel_scale = 2           # each cell drawn as 2x2 pixels
+show_pml    = false

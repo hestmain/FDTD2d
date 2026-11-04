@@ -1,0 +1,45 @@
+# Harmonic line source above a rigid floor, scattered by a rigid cylinder
+# and a triangular rigid wedge. The top and side boundaries absorb (PML).
+#
+# Run:  fdtd2d examples/line_source_obstacles.toml
+
+[simulation]
+duration = 0.008          # [s]
+cfl      = 0.7
+
+[grid]
+x_range = [0.0, 3.0]      # [m]
+y_range = [0.0, 2.0]      # [m]
+dx      = 0.01            # [m]
+
+[medium]
+density = 1.21            # [kg/m^3]
+c       = 343.0           # [m/s]
+
+[boundary]
+x_min = "pml"
+x_max = "pml"
+y_min = "rigid"           # reflecting floor
+y_max = "pml"
+
+[boundary.pml]
+thickness = 20
+
+[[obstacle]]              # rigid cylinder
+shape = { type = "circle", center = [1.8, 1.1], radius = 0.25 }
+
+[[obstacle]]              # rigid triangular wedge standing on the floor
+shape = { type = "polygon", vertices = [[2.3, 0.0], [2.7, 0.0], [2.5, 0.5]] }
+
+[[source]]
+# Line source: amplitude is the volume velocity per unit length and depth
+# Q' [m/s]; every point of the segment radiates in phase.
+shape  = { type = "segment", start = [0.4, 0.5], end = [0.4, 1.5] }
+signal = { type = "harmonic", frequency = 1000.0, amplitude = 5e-3, ramp_cycles = 2 }
+
+[output]
+directory   = "out/line_source_obstacles"
+every       = 10
+color_limit = "auto"      # symmetric limit = max |p| of each frame
+pixel_scale = 2
+show_pml    = true        # draw the PML too, physical domain outlined

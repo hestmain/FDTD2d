@@ -1,0 +1,4 @@
+tomlc17 vendored from https://github.com/cktan/tomlc17
+tag: R261003
+commit: 8d3766ddafa6515417f4885ae6878ef69fac401e
+files: src/tomlc17.c, src/tomlc17.h, LICENSE (unmodified)
