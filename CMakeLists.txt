@@ -1,14 +1,16 @@
 cmake_minimum_required(VERSION 3.20)
-project(fdtd2d VERSION 0.1.0 DESCRIPTION "2D acoustic FDTD simulator" LANGUAGES C)
+project(fdtd2d VERSION 1.0.0 DESCRIPTION "2D acoustic FDTD simulator" LANGUAGES C)
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
+#
 option(FDTD2D_BUILD_TESTS "Build unit and validation tests" ON)
 option(FDTD2D_WERROR "Treat compiler warnings as errors" OFF)
 option(FDTD2D_SANITIZE "Build with AddressSanitizer and UBSan" OFF)
 
+# use c11 standard
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
@@ -21,7 +23,7 @@ if(FDTD2D_SANITIZE)
   add_link_options(-fsanitize=address,undefined)
 endif()
 
-# ---- third party: tomlc17 (MIT, vendored, unmodified) --------------------
+# ---- third party: tomlc17 (MIT, vendored) --------------------
 add_library(tomlc17 STATIC third_party/tomlc17/tomlc17.c)
 set_target_properties(tomlc17 PROPERTIES C_STANDARD 17 POSITION_INDEPENDENT_CODE ON)
 target_include_directories(tomlc17 SYSTEM PUBLIC third_party/tomlc17)
@@ -39,7 +41,7 @@ add_library(fdtd2d_core STATIC
   src/solver.c
   src/render.c
 )
-target_include_directories(fdtd2d_core PUBLIC src)
+target_include_directories(fdtd2d_core PUBLIC src headers)
 # j0/y0 (tests), mkdir and friends need X/Open + POSIX declarations.
 target_compile_definitions(fdtd2d_core PUBLIC _XOPEN_SOURCE=700)
 target_link_libraries(fdtd2d_core PUBLIC PNG::PNG m PRIVATE tomlc17)
