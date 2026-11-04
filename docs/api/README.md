@@ -15,7 +15,7 @@ fdtd2d 是一个 C11 编写的二维声场 FDTD 仿真工具：无黏性理想�
        │         │              │
        │      source (声源离散)  │
        │         │              │
-  geometry  medium  signal  boundary  grid      ← 基础模块
+  geometry  medium  waveform  boundary  grid     ← 基础模块
                      │
                   common (错误、警告、内存)
 ```
@@ -26,13 +26,13 @@ fdtd2d 是一个 C11 编写的二维声场 FDTD 仿真工具：无黏性理想�
 | geometry | `src/geometry.[ch]` | 与网格无关的二维形状 | [geometry.md](geometry.md) |
 | grid | `src/grid.h` | 交错网格布局与索引换算（仅头文件） | [grid.md](grid.md) |
 | medium | `src/medium.[ch]` | 介质参数与介质表 | [medium.md](medium.md) |
-| signal | `src/signal.[ch]` | 声源时间函数（v1：简谐） | [signal.md](signal.md) |
+| waveform | `src/waveform.[ch]` | 声源时间函数（v1：简谐） | [waveform.md](waveform.md) |
 | boundary | `src/boundary.[ch]` | 外边界类型与 PML 参数 | [boundary.md](boundary.md) |
 | config | `src/config.[ch]` | 解析器第一层：TOML → `SimConfig` | [config.md](config.md) |
 | source | `src/source.[ch]` | 声源空间离散 | [source.md](source.md) |
 | model | `src/model.[ch]` | 解析器第二层：`SimConfig` → 网格模型 | [model.md](model.md) |
-| solver | `src/solver.[ch]` | FDTD 时间推进 | 待模块完成后提供 |
-| render | `src/render.[ch]` | 热力图 PNG 输出 | 待模块完成后提供 |
+| solver | `src/solver.[ch]` | FDTD 时间推进 | [solver.md](solver.md) |
+| render | `src/render.[ch]` | 热力图 PNG 输出 | [render.md](render.md) |
 
 依赖只能自上而下：基础模块互不依赖（只依赖 common），renderer 不依赖 model，也不依赖 solver。
 

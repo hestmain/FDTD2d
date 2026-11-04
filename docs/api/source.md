@@ -1,8 +1,8 @@
 # source：声源空间离散
 
-头文件：`src/source.h`　实现：`src/source.c`　依赖：geometry、grid、signal、common
+头文件：`src/source.h`　实现：`src/source.c`　依赖：geometry、grid、waveform、common
 
-本模块负责把声源形状离散到网格上，得到声源覆盖的单元及每个单元的权重。声源由空间分布和时间函数相乘得到：空间分布由形状决定，时间函数由 signal 模块提供。
+本模块负责把声源形状离散到网格上，得到声源覆盖的单元及每个单元的权重。声源由空间分布和时间函数相乘得到：空间分布由形状决定，时间函数由 waveform 模块提供。
 
 | 形状 | 声源类型 | 版本 |
 |---|---|---|
@@ -19,7 +19,7 @@ v1 的声源都是单极子体积注入源（软源），以源项的形式加�
 q(x, t) = s(t) · D(x)              单位 1/s（单位时间单位面积注入的体积，按单位深度计）
 ```
 
-s(t) 是时间函数，见 signal 模块。D(x) 是空间分布：
+s(t) 是时间函数，见 waveform 模块。D(x) 是空间分布：
 
 | 类型 | D(x) | 幅值 A 的含义 | A 的单位 |
 |---|---|---|---|
@@ -61,7 +61,7 @@ p(r) = (ωρQ/4) · H₀⁽²⁾(kr)
 
 ### 线源
 
-1. **裁剪**：把线段裁剪到物理域内。若长度因此变短，发出警告；若裁剪后什么都不剩，报错。
+1. **裁剪**：把线段裁剪到物理域内。若长度因此变短，发出警告；若裁剪后什么都不剩，或只剩一个点，报错。线段长度必须大于 0，这一点由 `shape_validate` 保证，这里不再检查。
 2. **分配长度**：逐列遍历线段经过的物理单元。每一列只检查线段实际穿过的那几行，所以计算量和内存都与线段长度成正比，不随包围盒面积增长。对每个单元，用 Liang–Barsky 算法计算线段落在其中的长度。即使线段恰好落在物理域的边界线上，也只分配给物理单元，不分给 PML 单元。
 3. **归一化**：把各单元的长度按同一比例缩放，使总和等于裁剪后的线段长度。这样，恰好落在格线上的线段不会被相邻的两个单元重复计入。
 4. **固体剔除**：去掉落在固体单元上的部分，并发出警告，说明去掉的长度占总长的百分比。若全部落在固体上，报错。
@@ -92,13 +92,15 @@ int source_discretize(const Shape *shape, const Signal *signal, const Grid *g,
 
 | 参数 | 说明 |
 |---|---|
-| `shape` | 声源形状。v1 只接受 point 和 segment |
-| `signal` | 时间函数，会被复制到 `out->signal` |
-| `g` | 网格 |
+| `shape` | 非 `NULL`，声源形状，已通过 `shape_validate`。v1 只接受 point 和 segment |
+| `signal` | 非 `NULL`，时间函数，已通过 `signal_validate`，会被复制到 `out->signal` |
+| `g` | 非 `NULL`，网格，要求 `dx > 0`、`dy > 0`、`nx ≥ 1`、`ny ≥ 1` |
 | `solid` | 固体掩码 `[nx*ny]`，非 0 表示固体；可为 `NULL`，表示没有障碍物 |
-| `out` | 输出，会被先清零 |
+| `out` | 非 `NULL`，输出，会被先清零 |
 
-成功返回 0。失败返回 -1，此时 `*out` 为全零。可能的错误：
+本函数不检查指针是否为 `NULL`，也不检查网格和形状本身是否合法。这些由调用方保证：`model_build()` 传入的网格是自己构造的，形状和信号来自 `config_load_*` 的校验结果。
+
+成功返回 0。失败返回 -1，此时 `*out` 为全零。可能的错误（只涉及形状与网格的相对位置）：
 
 | 情况 | 错误信息（示例） |
 |---|---|
@@ -106,7 +108,7 @@ int source_discretize(const Shape *shape, const Signal *signal, const Grid *g,
 | 点在障碍物内 | `point (1.2, 0.75) lies inside a rigid obstacle` |
 | 线段与物理域不相交 | `segment (...)-(...) does not cross the physical domain ...` |
 | 线段完全落在固体上 | `segment (...)-(...) lies on rigid cells only` |
-| 面状形状 | `circle source is not supported in this version` |
+| 点、线段以外的形状（rect、circle、polygon） | `circle source is not supported in this version` |
 
 model 调用时会在错误信息前加上 `source[k]: `。
 

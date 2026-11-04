@@ -64,7 +64,7 @@ const char *boundary_type_name(BoundaryType type);
 int boundary_type_from_name(const char *name, BoundaryType *out);
 ```
 
-在枚举和 TOML 名称之间转换，名称区分大小写。用法与 `shape_type_from_name` 相同：成功返回 0，未知名称返回 -1。
+在枚举和 TOML 名称之间转换，名称区分大小写。`boundary_type_name` 的 `type` 必须是有效枚举值（小于 `BC_TYPE_COUNT`）。`boundary_type_from_name` 的 `name` 不能为 `NULL`，用法与 `shape_type_from_name` 相同：成功返回 0，未知名称返回 -1。
 
 ### `side_name`
 
@@ -72,7 +72,7 @@ int boundary_type_from_name(const char *name, BoundaryType *out);
 const char *side_name(Side side);
 ```
 
-返回 `"x_min"`、`"x_max"`、`"y_min"` 或 `"y_max"`，与 TOML `[boundary]` 表中的键名一致；非法值返回 `"unknown"`。
+返回 `"x_min"`、`"x_max"`、`"y_min"` 或 `"y_max"`，与 TOML `[boundary]` 表中的键名一致。`side` 必须是有效枚举值（小于 `SIDE_COUNT`）。
 
 ### `pml_params_validate`
 

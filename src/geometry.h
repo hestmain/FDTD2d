@@ -41,9 +41,10 @@ typedef struct Shape {
     } u;
 } Shape;
 
-/* "point", "segment", "rect", "circle", "polygon" (the TOML type names). */
+/* "point", "segment", "rect", "circle", "polygon" (the TOML type names).
+ * type must be a valid enumerator (< SHAPE_TYPE_COUNT). */
 const char *shape_type_name(ShapeType type);
-/* Returns 0 and sets *out if name is a known type name, else -1. */
+/* Returns 0 and sets *out if name (not NULL) is a known type name, else -1. */
 int shape_type_from_name(const char *name, ShapeType *out);
 
 /* True for shapes that enclose an area: rect, circle, polygon. */

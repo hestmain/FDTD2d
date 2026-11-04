@@ -36,11 +36,14 @@ typedef struct PmlParams {
 #define PML_DEFAULT_REFLECTION 1e-6
 #define PML_DEFAULT_ORDER 2.0
 
-/* "rigid", "pressure_release", "pml" */
+/* "rigid", "pressure_release", "pml". type must be a valid enumerator
+ * (< BC_TYPE_COUNT). */
 const char *boundary_type_name(BoundaryType type);
+/* Returns 0 and sets *out if name (not NULL) is a known type name, else -1. */
 int boundary_type_from_name(const char *name, BoundaryType *out);
 
-/* "x_min", "x_max", "y_min", "y_max" */
+/* "x_min", "x_max", "y_min", "y_max". side must be a valid enumerator
+ * (< SIDE_COUNT). */
 const char *side_name(Side side);
 
 int pml_params_validate(const PmlParams *p, FdtdError *err);

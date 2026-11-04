@@ -55,25 +55,39 @@ typedef struct Solver {
 } Solver;
 
 /* Allocate fields (zero initial state) and precompute coefficients.
- * On error returns -1 with *s zeroed. */
+ * Preconditions: s and m are non-NULL; *m was built by model_build() and
+ * stays valid (not modified, not freed) until solver_free(); err may be
+ * NULL. The model's grid, dt, medium map, damping tables, boundary types
+ * and source cells are not re-validated. Checked here: the grid size does
+ * not overflow size_t, allocations succeed, and every fluid cell has finite
+ * rho > 0 and K > 0 and every sigma is finite.
+ * On error returns -1 with *s zeroed (nothing to free). */
 int solver_init(Solver *s, const Model *m, FdtdError *err);
 
+/* Releases all arrays and zeroes *s. Accepts NULL, a zeroed struct and
+ * repeated calls. Call before model_free(). */
 void solver_free(Solver *s);
 
 /* Advance one time step, injecting all m->sources (read on every call, so
- * callers may change model->n_sources between steps, e.g. in tests). */
+ * callers may change model->n_sources between steps, e.g. in tests).
+ * Precondition for this and the three functions below: *s was initialised
+ * by a successful solver_init() and not freed since. */
 void solver_step(Solver *s);
 
-/* Total pressure p = px + py for all nx*ny cells (solid cells: 0). */
+/* Total pressure p = px + py for all nx*ny cells (solid cells: 0).
+ * out must have room for nx*ny values. */
 void solver_get_pressure(const Solver *s, double *out);
 
-/* Pressure at one cell index. */
+/* Pressure at one cell index; cell < nx*ny. */
 double solver_pressure_at(const Solver *s, size_t cell);
 
 /* Acoustic energy per unit depth [J/m] over the WHOLE grid:
- *   sum_fluid p^2/(2K) dx dy + sum_active_faces rho_face v^2/2 dx dy.
+ *   sum_fluid p^2/(2K) dx dy + sum_active_faces w rho_face v^2/2 dx dy,
+ * w = 1 for interior faces and w = 1/2 for the outer faces of
+ * pressure_release sides (only half of their control volume lies inside
+ * the grid; with this weight the discrete energy balance closes exactly).
  * (p and v are half a step apart; the value oscillates slightly but must
- * not drift in a lossless closed domain.) */
+ * not drift in a lossless domain with rigid / pressure_release sides.) */
 double solver_acoustic_energy(const Solver *s);
 
 #endif /* FDTD2D_SOLVER_H */

@@ -24,10 +24,62 @@
 | 流程 | **每个模块完成后交给用户检查**，用户确认后再进入下一步 |
 | 子代理 | 模型 `model_id = "fast"`（用户已设为 Sonnet）。用户要求“极高挡位”，但 Task 工具没有设置推理挡位的参数，目前只在提示词里要求 “work very thoroughly” |
 
-还没有得到用户答复的事项：
-- 是否执行 `git init`；
-- 用户是否认可 `examples/*.toml` 中的配置格式；
-- 文档用中文、代码注释用英文，是否统一成一种语言。
+Git：仓库由用户的 IDE（CLion）初始化，分支为 `master`，没有远程仓库。
+- 首次提交 `3ea6b88`：核心模块、解析器、求解器、命令行、测试、示例和文档；渲染器为占位代码。
+- `.gitignore` 忽略 `build*/`、`cmake-build-*/`、`.idea/` 和 `output/`。
+- 用户没要求时不提交，也不推送。
+
+用户已确认：`examples/*.toml` 的配置格式认可；文档中文、代码注释英文保持不变。
+
+用户决定：`src/signal.[ch]` 改名为 `src/waveform.[ch]`，已完成，`docs/api/signal.md` 同步改为 `waveform.md`。类型、函数名（`Signal`、`signal_*`）和 TOML 键 `signal` 保持不变。现在用 `-Isrc` 也能拿到系统的 `<signal.h>`，已用实际编译验证。
+
+用户要求（✅ 已完成，等待用户检查）：检查不必要的防御性编程并安全去除。
+- 结果：src 由 4793 行减到 4547 行，测试只删除了针对被删检查的用例。
+- 复审 `review-defclean` 结论为 APPROVE。它的 m1 已修：派生出的 dt 可能上溢，`model.c` 已补上 `isfinite(dt)`，并加了测试。m3 也已修：solver 保留下来的 K 和 σ 检查补了测试 `test_init_rejects_unusable_coefficients`。两项都做过变异检查，确认测试能抓到问题。
+- 验证：
+  - Release 和 ASan 构建下 ctest 全部通过：geometry 17、config 42、model 17、source 18、solver 23、render 21；
+  - 两个示例的 `--check` 输出、frames.csv 和全部 PNG 与清理前的二进制逐字节一致。
+- 未处理：
+  - 复审的 m4：main.c 提前做的 65535 检查没有 CLI 测试；
+  - Nit：`cell_is_solid` 可以内联，test_model 里有一处重复的 CHECK。只读审查分两路：
+- `audit-def-a`：config、main、common、boundary、medium、waveform、geometry；
+- `audit-def-b`：model、source、solver、render、grid。
+
+判定标准：
+- 保留：信任边界检查、真实运行时条件、已文档化并被清理路径依赖的约定。
+- 可删：不可达代码（D1）、对上游已保证数据的重复校验（D2）、内部 API 的编程错误检查（D3）、冗余覆盖（D4）、类型上不可能的条件（D5）。
+
+去除前的快照在 `/tmp/fdtd2d-snapshot-cp34`，内容是检查点 3/4 的未提交状态，可以用来把求解器/渲染器和本次清理拆成两个提交。去除前的二进制和参考输出在 `/tmp/fdtd2d-ref/`。
+
+我的决策（审计 ID 见两份审计报告）：
+- **原则**：只在信任边界校验一次。
+  - config.c 校验全部用户输入；
+  - model 只校验与网格相关的事实；
+  - solver 和 render 依赖文档写明的前置条件。
+- **保留**：
+  - 各 `*_validate` 函数；
+  - `err` 可为 NULL、`*_free` 幂等、构建失败时把输出清零这三条约定；
+  - 分配、I/O 和尺寸溢出检查；
+  - solver 的 V6 溢出、V10（K 上溢/下溢）、V11（σ 有限）；
+  - render 的 65535 上限、轮廓裁剪、colormap 的 NaN 处理；
+  - config 的 F4、F5、F13、F16；
+  - `shape_validate` 的有限性检查（G1–G3），W1–W3；
+  - main 的 M2、CLI 检查和 NaN 扫描。
+- **去除**：
+  - main：M1、M3；
+  - config：F1–F3、F6–F12、F14、F15；
+  - boundary/waveform/geometry：B2、B3、G4；
+  - model：M1、M2、M4–M19、M21、M22（M8 需先证明）；
+  - source：S1–S5，S6 合并；
+  - medium：init/add 里的重复 validate、count 守卫；
+  - solver：V1–V5、V7–V9、V12、V13、V15–V18；
+  - render：R1–R5、R7。
+- **已知风险**：去掉 V7、V9、R4 以后，生产者如果出错，会造成静默越界。现在依靠生产者自身的保证、`check_source_sane` 测试和 ASan 构建兜底。
+
+实施分三路并行，文件互不重叠：
+- `impl-def-input`：config、main、geometry、boundary、waveform 及其测试和文档；
+- `impl-def-model`：model、source、medium 及其测试和文档；
+- `impl-def-solver`：solver、render 及其测试和文档。
 
 ## 2. 构建与测试（重要）
 
@@ -55,15 +107,20 @@ CTest 中的测试：
 | geometry | `src/geometry.[ch]` | ✅ 完成，`test_geometry` 17/17 | `geometry.md` | 检查点 1，待确认 |
 | grid | `src/grid.h` | ✅ 完成 | `grid.md` | 检查点 1，待确认 |
 | medium | `src/medium.[ch]` | ✅ 完成 | `medium.md` | 检查点 1，待确认 |
-| signal | `src/signal.[ch]` | ✅ 完成 | `signal.md` | 检查点 1，待确认 |
+| waveform（原 signal） | `src/waveform.[ch]` | ✅ 完成 | `waveform.md` | 检查点 1，待确认 |
 | boundary | `src/boundary.[ch]` | ✅ 完成 | `boundary.md` | 检查点 1，待确认 |
 | **解析器** config | `src/config.[ch]` | ✅ 完成，`test_config` 42/42 | `config.md` | **检查点 2：待复审通过后提交** |
-| **解析器** source | `src/source.[ch]` | ✅ 完成，`test_source` 20/20 | `source.md` | 检查点 2 |
+| **解析器** source | `src/source.[ch]` | ✅ 完成，`test_source` 18/18（防御清理后） | `source.md` | 检查点 2 |
 | **解析器** model | `src/model.[ch]` | ✅ 完成，`test_model` 17/17 | `model.md` | 检查点 2 |
-| 求解器 solver | `src/solver.[ch]` | ✅ 实现完成（原子代理被取消，但代码已写完）。`test_solver` 15/15，Release 和 ASan 均通过。🔄 独立审查 `review-solver1` 进行中 | 未写 | 未提交 |
-| 渲染器 render | `src/render.[ch]` | 🔄 重新派出 `impl-render4`（fast）。`render.c` 仍是 STUB | 未写 | 未提交 |
-| 命令行 | `src/main.c` | ✅ 已写完（主循环、PNG 帧、frames.csv、summary.txt、NaN 检测），等求解器和渲染器完成后才能端到端运行 | 待写（可放在 README 或 cli.md） | 未提交 |
+| 求解器 solver | `src/solver.[ch]` | ✅ 审查意见已修复，`test_solver` 22/22，ASan 通过 | `solver.md` | **检查点 3，已提交给用户** |
+| 渲染器 render | `src/render.[ch]` | ✅ 审查 APPROVE，Minor 已修，`test_render` 21/21（防御清理后），ASan 通过 | `render.md` | **检查点 4，已提交给用户** |
+| 命令行 | `src/main.c` | ✅ 两个示例端到端跑通（Release 和 ASan）。新增：模型构建后、写任何文件前检查帧尺寸是否超过 65535 | 待写（README 或 cli.md） | 未提交 |
 | 验证测试 | `tests/test_validation.c` | ⏳ 占位，还没写 | — | — |
+
+求解器审查 `review-solver1` 的问题：
+- **Major M1**：测试全部使用方形单元，dx≠dy 以及 x/y 方向互换都没有覆盖。
+- **Minor m1**：压力释放边界外层面的能量应取半权。我已手推确认。
+- **Minor m2–m4**：需要加强相关测试。
 
 所有模块的头文件（接口契约）都已写好。实现须严格遵守头文件的注释；文档与头文件不一致时以头文件为准，并修正文档。
 
@@ -93,8 +150,25 @@ CTest 中的测试：
 
 | bg_task_id | 角色 | 内容 | 独占写入范围 |
 |---|---|---|---|
-| `review-solver1_bg1` | independent-reviewer（fast） | 求解器独立审查 | 只读 |
-| `impl-render4_bg1` | implementation-engineer（fast） | 渲染器加单元测试。完整规格见压缩记录 8-8493.txt 第 4344 行的 T3 提示词 | `src/render.c`、`tests/test_render.c`；构建目录 `/tmp/fdtd2d-T3*` |
+当前没有后台任务。`solver.md`、`render.md` 已写完，我已抽查并修正。同时修正了几处注释：
+- `source.h`：线源权重单位改为 1/m；
+- `render.h`：宏名改为 `RENDER_SOLID_R/G/B`，零值颜色写明为 247；
+- `test_solver.c`：“121 步”改为约 96 步；
+- `config.md`：`show_pml` 的说明。
+
+已完成的任务：
+- **`impl-solver4`**：M1、m1–m4 和 nits 全部处理。`test_solver` 共 22 项，Release 下约 1.05 s，ASan 下约 11 s。变异检查确认新测试能发现 dx/dy 互换和半权错误。我已检查 diff 并复跑通过。
+- **`review-render1`**：结论 APPROVE，有 Minor 问题。我已修复：
+  - 失败时删除文件前先 `lstat`，并比对 dev/ino，不会误删符号链接；
+  - 新增 crop 偏移 + scale 3 的轮廓测试；
+  - 新增 `-inf` 视为自动范围的测试；
+  - `render.h` 补充了非有限值和清理规则的说明。
+
+  `test_render` 改为 22 项，防御清理后为 21 项。未处理的问题：`/dev/full` 以外的写失败路径没有测试（signal.h 遮蔽已因改名解决，可补测试），fd 检查偏弱，错误信息缺少 errno。
+
+性能（Release -O3，Ryzen 9 7845HX）：149600 个单元跑 5544 步用时 1.37 s，约 6e8 单元·步/秒。
+
+端到端运行：两个示例都已跑通，每个约 0.5–0.7 s，各输出 58 个文件，PNG 目视正确。点源示例设了 `color_limit = 1.0`，r < 1 m 的区域颜色饱和。这是显示设置造成的，不是缺陷：实测幅值与 ωρQ/4·√(2/πkr) 的估算一致。
 
 如果这些任务已经丢失，就重新派出。重新派出前先看文件的当前内容，已有的实现可以接着做。旧任务 `review-parser2`、`impl-solver3`、`impl-render3` 已结束或已取消。
 

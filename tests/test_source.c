@@ -13,7 +13,7 @@
 #include "common.h"
 #include "geometry.h"
 #include "grid.h"
-#include "signal.h"
+#include "waveform.h"
 #include "source.h"
 
 #include "test_util.h"
@@ -570,19 +570,6 @@ static void test_segment_outside_domain(void)
     check_source_zeroed(&s);
 }
 
-static void test_segment_zero_length(void)
-{
-    const Grid g = plain_grid(10, 10, 0.1, 0.1);
-    const Signal sig = harmonic_signal(1000.0, 1.0);
-    const Shape sh = segment_from(0.5, 0.5, 0.5, 0.5);
-    ModelSource s;
-    FdtdError err = {{0}};
-
-    CHECK(source_discretize(&sh, &sig, &g, NULL, &s, &err) == -1);
-    CHECK_CONTAINS(err.msg, "zero length");
-    check_source_zeroed(&s);
-}
-
 static void test_segment_drops_solid_cells(void)
 {
     const Grid g = plain_grid(10, 10, 0.1, 0.1);
@@ -676,34 +663,6 @@ static void test_area_shapes_rejected(void)
     check_source_zeroed(&s);
 }
 
-/* -------------------------------------------------------- invalid input */
-
-static void test_invalid_arguments(void)
-{
-    const Grid g = plain_grid(10, 10, 0.1, 0.1);
-    const Signal sig = harmonic_signal(1000.0, 1.0);
-    const Shape sh = point_at(0.35, 0.35);
-    ModelSource s;
-    FdtdError err = {{0}};
-
-    CHECK(source_discretize(NULL, &sig, &g, NULL, &s, &err) == -1);
-    check_source_zeroed(&s);
-
-    CHECK(source_discretize(&sh, NULL, &g, NULL, &s, &err) == -1);
-    check_source_zeroed(&s);
-
-    CHECK(source_discretize(&sh, &sig, NULL, NULL, &s, &err) == -1);
-    check_source_zeroed(&s);
-
-    Grid bad = plain_grid(10, 10, 0.0, 0.1); /* dx <= 0 */
-    CHECK(source_discretize(&sh, &sig, &bad, NULL, &s, &err) == -1);
-    check_source_zeroed(&s);
-
-    bad = plain_grid(0, 10, 0.1, 0.1);
-    CHECK(source_discretize(&sh, &sig, &bad, NULL, &s, &err) == -1);
-    check_source_zeroed(&s);
-}
-
 /* ------------------------------------------------------- metadata / free */
 
 static void test_metadata_and_free(void)
@@ -784,11 +743,9 @@ int main(void)
     RUN_TEST(test_segment_with_pml_offset);
     RUN_TEST(test_segment_clipped);
     RUN_TEST(test_segment_outside_domain);
-    RUN_TEST(test_segment_zero_length);
     RUN_TEST(test_segment_drops_solid_cells);
     RUN_TEST(test_segment_all_solid);
     RUN_TEST(test_area_shapes_rejected);
-    RUN_TEST(test_invalid_arguments);
     RUN_TEST(test_metadata_and_free);
     RUN_TEST(test_zeroed_mask_matches_null);
 

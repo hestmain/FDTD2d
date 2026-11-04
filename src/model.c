@@ -29,15 +29,6 @@ static int axis_cell_count(double lo, double hi, double h, char axis, int *out,
                            FdtdError *err)
 {
     char hname[3] = {'d', axis, '\0'};
-    if (!isfinite(lo) || !isfinite(hi) || !(hi > lo)) {
-        fdtd_error_set(err, "grid: %c_range must satisfy lower < upper (got [%g, %g])",
-                       axis, lo, hi);
-        return -1;
-    }
-    if (!isfinite(h) || !(h > 0.0)) {
-        fdtd_error_set(err, "grid: %s must be a finite value > 0 (got %g)", hname, h);
-        return -1;
-    }
     const double len = hi - lo;
     const double q = len / h;
     if (!isfinite(q)) {
@@ -75,39 +66,31 @@ static PmlProfile make_profile(const PmlParams *p, double h, double c_ref)
 {
     PmlProfile prof;
     prof.L = (double)p->thickness * h;
-    prof.sigma_max = 0.0;
-    if (prof.L > 0.0 && p->reflection > 0.0 && p->reflection < 1.0) {
-        prof.sigma_max = -(p->order + 1.0) * c_ref * log(p->reflection) / (2.0 * prof.L);
-    }
+    prof.sigma_max = -(p->order + 1.0) * c_ref * log(p->reflection) / (2.0 * prof.L);
     return prof;
 }
 
-/* Damping at depth d [m] into the PML (0 at or outside the interface). */
+/* Damping at depth d [m] into the PML (0 at or outside the interface).
+ * fill_sigma_axis() only passes d = k * h (0 <= k <= T) or (k + 0.5) * h
+ * (0 <= k < T), T = PML thickness in cells, with exactly representable
+ * multipliers; rounding is monotonic, so d <= fl(T * h) = L and
+ * d / L <= 1 without clamping. */
 static double profile_sigma(const PmlProfile *prof, double order, double d)
 {
-    if (!(d > 0.0) || !(prof->L > 0.0)) {
-        return 0.0;
+    if (!(d > 0.0)) {
+        return 0.0; /* also keeps pow(0, 0) from returning 1 */
     }
-    double r = d / prof->L;
-    if (r > 1.0) {
-        r = 1.0;
-    }
-    return prof->sigma_max * pow(r, order);
+    return prof->sigma_max * pow(d / prof->L, order);
 }
 
 /* Fill one axis' damping profiles. `off` is the index of the first physical
  * cell, so the lower interface sits at face `off` and the upper one at face
- * off + n_phys. Non-PML sides keep sigma = 0 everywhere. */
+ * off + n_phys. `cell` [n] and `face` [n+1] must be zero-initialised;
+ * non-PML sides keep sigma = 0 everywhere. */
 static void fill_sigma_axis(double *cell, double *face, int n, int off, int n_phys,
                             int pml_lo, int pml_hi, double h, const PmlParams *p,
                             double c_ref)
 {
-    for (int i = 0; i < n; i++) {
-        cell[i] = 0.0;
-    }
-    for (int i = 0; i <= n; i++) {
-        face[i] = 0.0;
-    }
     if (pml_lo) {
         const PmlProfile prof = make_profile(p, h, c_ref);
         for (int i = 0; i <= off; i++) {
@@ -131,50 +114,22 @@ static void fill_sigma_axis(double *cell, double *face, int n, int off, int n_ph
     }
 }
 
-static int build_pml(Model *m, const SimConfig *cfg, FdtdError *err)
+static void build_pml(Model *m, const SimConfig *cfg)
 {
     m->pml = cfg->pml;
     for (int s = 0; s < SIDE_COUNT; s++) {
-        if ((int)cfg->boundary[s] < 0 || cfg->boundary[s] >= BC_TYPE_COUNT) {
-            fdtd_error_set(err, "boundary: unknown type %d on side %s",
-                           (int)cfg->boundary[s], side_name((Side)s));
-            return -1;
-        }
         m->boundary[s] = cfg->boundary[s];
-        if (cfg->boundary[s] == BC_PML) {
-            /* Invalid R/order would silently give sigma = 0, i.e. a rigid
-             * wall that looks like a PML; reject it here as well. */
-            if (pml_params_validate(&cfg->pml, err) != 0) {
-                fdtd_error_prefix(err, "boundary: %s", side_name((Side)s));
-                return -1;
-            }
-            m->pml_cells[s] = cfg->pml.thickness;
-        } else {
-            m->pml_cells[s] = 0;
-        }
+        m->pml_cells[s] = cfg->boundary[s] == BC_PML ? cfg->pml.thickness : 0;
     }
-    return 0;
 }
 
-/* Mark every cell whose centre lies inside an obstacle shape. */
-static int build_solid_mask(Model *m, const SimConfig *cfg, size_t n_cells,
-                            FdtdError *err)
+/* Mark every cell whose centre lies inside an obstacle shape. m->solid and
+ * m->n_solid start zeroed. */
+static void build_solid_mask(Model *m, const SimConfig *cfg, size_t n_cells)
 {
     const Grid *g = &m->grid;
-    m->n_solid = 0;
-    if (cfg->n_obstacles <= 0) {
-        return 0;
-    }
-    if (!cfg->obstacles) {
-        fdtd_error_set(err, "obstacles: %d entries but no shape list", cfg->n_obstacles);
-        return -1;
-    }
     for (int k = 0; k < cfg->n_obstacles; k++) {
         const Shape *shape = &cfg->obstacles[k].shape;
-        if (shape_validate(shape, err) != 0) {
-            fdtd_error_prefix(err, "obstacle[%d]", k);
-            return -1;
-        }
         Vec2 bmin, bmax;
         shape_bbox(shape, &bmin, &bmax);
         const int i_lo = clamp_cell_index(floor((bmin.x - g->x0) / g->dx) +
@@ -210,25 +165,20 @@ static int build_solid_mask(Model *m, const SimConfig *cfg, size_t n_cells,
                       k, shape_type_name(shape->type), in_pml);
         }
     }
-    m->n_solid = 0;
     for (size_t c = 0; c < n_cells; c++) {
         if (m->solid[c]) {
             m->n_solid++;
         }
     }
-    return 0;
 }
 
 /* Warn when the shortest wavelength is resolved by too few cells. */
 static void check_resolution(const SimConfig *cfg, const Grid *g, double c_min)
 {
     double f_max = 0.0;
-    if (!cfg->sources) {
-        return; /* no list: nothing to look at (validated by the caller) */
-    }
     for (int k = 0; k < cfg->n_sources; k++) {
         const double f = signal_max_frequency(&cfg->sources[k].signal);
-        if (isfinite(f) && f > f_max) {
+        if (f > f_max) {
             f_max = f;
         }
     }
@@ -269,11 +219,6 @@ static int model_build_impl(const SimConfig *cfg, Model *m, FdtdError *err)
     Grid *g = &m->grid;
 
     m->duration = cfg->duration;
-    if (!isfinite(m->duration) || !(m->duration > 0.0)) {
-        fdtd_error_set(err, "simulation: duration must be a finite value > 0 (got %g)",
-                       m->duration);
-        return -1;
-    }
 
     /* ---- grid geometry ---------------------------------------------------- */
     int nx_phys = 0;
@@ -284,9 +229,7 @@ static int model_build_impl(const SimConfig *cfg, Model *m, FdtdError *err)
     if (axis_cell_count(cfg->y_range[0], cfg->y_range[1], cfg->dy, 'y', &ny_phys, err) != 0) {
         return -1;
     }
-    if (build_pml(m, cfg, err) != 0) {
-        return -1;
-    }
+    build_pml(m, cfg);
     const long long ll_nx = (long long)m->pml_cells[SIDE_X_MIN] + (long long)nx_phys +
                             (long long)m->pml_cells[SIDE_X_MAX];
     const long long ll_ny = (long long)m->pml_cells[SIDE_Y_MIN] + (long long)ny_phys +
@@ -335,11 +278,6 @@ static int model_build_impl(const SimConfig *cfg, Model *m, FdtdError *err)
         return -1;
     }
     if (cfg->dt_set) {
-        if (!isfinite(cfg->dt) || !(cfg->dt > 0.0)) {
-            fdtd_error_set(err, "simulation: dt must be a finite value > 0 (got %g)",
-                           cfg->dt);
-            return -1;
-        }
         m->dt = cfg->dt;
         m->cfl = c_max * m->dt * sqrt(inv2);
         if (!(m->cfl <= 1.0)) {
@@ -348,13 +286,16 @@ static int model_build_impl(const SimConfig *cfg, Model *m, FdtdError *err)
             return -1;
         }
     } else {
-        if (!isfinite(cfg->cfl) || !(cfg->cfl > 0.0) || cfg->cfl > 1.0) {
-            fdtd_error_set(err, "simulation: cfl must satisfy 0 < cfl <= 1 (got %g)",
-                           cfg->cfl);
-            return -1;
-        }
         m->cfl = cfg->cfl;
         m->dt = cfg->cfl / denom;
+        /* denom can be finite but tiny (very slow medium and huge cells),
+         * then dt overflows. */
+        if (!isfinite(m->dt)) {
+            fdtd_error_set(err, "simulation: the derived time step cfl / (c_max * "
+                                "sqrt(1/dx^2 + 1/dy^2)) overflows (c_max = %g m/s, "
+                                "dx = %g m, dy = %g m)", c_max, g->dx, g->dy);
+            return -1;
+        }
     }
     double steps = ceil(m->duration / m->dt - 1e-9);
     if (!(steps >= 1.0)) {
@@ -372,9 +313,7 @@ static int model_build_impl(const SimConfig *cfg, Model *m, FdtdError *err)
     if (!m->solid) {
         return -1;
     }
-    if (build_solid_mask(m, cfg, n_cells, err) != 0) {
-        return -1;
-    }
+    build_solid_mask(m, cfg, n_cells);
 
     /* ---- PML damping profiles --------------------------------------------- */
     m->sigma_x_cell = fdtd_calloc((size_t)g->nx, sizeof *m->sigma_x_cell, err);
@@ -392,11 +331,6 @@ static int model_build_impl(const SimConfig *cfg, Model *m, FdtdError *err)
                     m->boundary[SIDE_Y_MAX] == BC_PML, g->dy, &m->pml, c_max);
 
     /* ---- sources ---------------------------------------------------------- */
-    /* Validate the list before anything reads cfg->sources[k]. */
-    if (cfg->n_sources < 0 || (cfg->n_sources > 0 && !cfg->sources)) {
-        fdtd_error_set(err, "sources: invalid source list (%d entries)", cfg->n_sources);
-        return -1;
-    }
     check_resolution(cfg, g, c_min);
     if (build_sources(m, cfg, err) != 0) {
         return -1;
@@ -406,18 +340,9 @@ static int model_build_impl(const SimConfig *cfg, Model *m, FdtdError *err)
 
 int model_build(const SimConfig *cfg, Model *m, FdtdError *err)
 {
-    if (!m) {
-        fdtd_error_set(err, "model: no output model given");
-        return -1;
-    }
     memset(m, 0, sizeof *m);
-    if (!cfg) {
-        fdtd_error_set(err, "model: no configuration given");
-        return -1;
-    }
     if (model_build_impl(cfg, m, err) != 0) {
-        model_free(m);
-        memset(m, 0, sizeof *m);
+        model_free(m); /* also leaves *m zeroed */
         return -1;
     }
     return 0;
@@ -428,10 +353,8 @@ void model_free(Model *m)
     if (!m) {
         return;
     }
-    if (m->sources) {
-        for (int k = 0; k < m->n_sources; k++) {
-            model_source_free(&m->sources[k]);
-        }
+    for (int k = 0; k < m->n_sources; k++) {
+        model_source_free(&m->sources[k]);
     }
     free(m->sources);
     free(m->sigma_x_cell);
@@ -450,7 +373,7 @@ static double model_f_max(const Model *m)
     double f_max = 0.0;
     for (int k = 0; k < m->n_sources; k++) {
         const double f = signal_max_frequency(&m->sources[k].signal);
-        if (isfinite(f) && f > f_max) {
+        if (f > f_max) {
             f_max = f;
         }
     }
@@ -459,9 +382,6 @@ static double model_f_max(const Model *m)
 
 void model_print_summary(FILE *out, const Model *m)
 {
-    if (!out || !m) {
-        return;
-    }
     const Grid *g = &m->grid;
 
     fprintf(out, "grid:  %d x %d cells physical, %d x %d cells total (incl. PML)\n",

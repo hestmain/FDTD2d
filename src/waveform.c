@@ -1,4 +1,4 @@
-#include "signal.h"
+#include "waveform.h"
 
 #include <math.h>
 #include <string.h>
@@ -13,17 +13,11 @@ static const char *const k_signal_names[SIGNAL_TYPE_COUNT] = {
 
 const char *signal_type_name(SignalType type)
 {
-    if ((int)type < 0 || type >= SIGNAL_TYPE_COUNT) {
-        return "unknown";
-    }
     return k_signal_names[type];
 }
 
 int signal_type_from_name(const char *name, SignalType *out)
 {
-    if (!name) {
-        return -1;
-    }
     for (int t = 0; t < SIGNAL_TYPE_COUNT; t++) {
         if (strcmp(name, k_signal_names[t]) == 0) {
             *out = (SignalType)t;

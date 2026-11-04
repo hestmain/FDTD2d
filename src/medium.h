@@ -26,18 +26,24 @@ typedef struct MediumTable {
     int count;
 } MediumTable;
 
-/* Check density > 0, c > 0, both finite. */
+/* Check density > 0, c > 0, both finite. This is the only place media are
+ * validated (config_load_* calls it); the table functions below expect
+ * media that already passed it. */
 int medium_validate(const Medium *m, FdtdError *err);
 
 /* Bulk modulus K = rho * c^2 [Pa]. */
 double medium_bulk_modulus(const Medium *m);
 
-/* Initialise the table with the background medium as entry 0. */
+/* Initialise the table with the background medium as entry 0. `background`
+ * must already be valid. Returns -1 (with *t zeroed) on out of memory. */
 int medium_table_init(MediumTable *t, const Medium *background, FdtdError *err);
 
-/* Append a medium; returns its index (>= 1) or -1 on error. */
+/* Append a medium, which must already be valid; returns its index (>= 1) or
+ * -1 on error (table full or out of memory; the table is left unchanged). */
 int medium_table_add(MediumTable *t, const Medium *m, FdtdError *err);
 
+/* Largest / smallest sound speed in a table initialised by
+ * medium_table_init() (count >= 1). */
 double medium_table_c_max(const MediumTable *t);
 double medium_table_c_min(const MediumTable *t);
 

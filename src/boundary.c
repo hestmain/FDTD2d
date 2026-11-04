@@ -18,17 +18,11 @@ static const char *const k_side_names[SIDE_COUNT] = {
 
 const char *boundary_type_name(BoundaryType type)
 {
-    if ((int)type < 0 || type >= BC_TYPE_COUNT) {
-        return "unknown";
-    }
     return k_bc_names[type];
 }
 
 int boundary_type_from_name(const char *name, BoundaryType *out)
 {
-    if (!name) {
-        return -1;
-    }
     for (int t = 0; t < BC_TYPE_COUNT; t++) {
         if (strcmp(name, k_bc_names[t]) == 0) {
             *out = (BoundaryType)t;
@@ -40,9 +34,6 @@ int boundary_type_from_name(const char *name, BoundaryType *out)
 
 const char *side_name(Side side)
 {
-    if ((int)side < 0 || side >= SIDE_COUNT) {
-        return "unknown";
-    }
     return k_side_names[side];
 }
 

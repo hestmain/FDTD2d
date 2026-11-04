@@ -31,7 +31,7 @@ add_library(fdtd2d_core STATIC
   src/common.c
   src/geometry.c
   src/medium.c
-  src/signal.c
+  src/waveform.c
   src/boundary.c
   src/config.c
   src/source.c

@@ -2,7 +2,9 @@
  * test_model.c - unit tests for the SimConfig -> Model layer.
  *
  * The TOML parser is a separate module (and test), so SimConfig structs are
- * filled in by hand here. Everything is checked against the contract in
+ * filled in by hand here. They are always valid, as config_load_* would make
+ * them: model_build() only checks what depends on the grid. Everything is
+ * checked against the contract in
  * model.h: grid size and PML offsets, dt/CFL/n_steps, PML damping profiles,
  * the rigid obstacle mask, the resolution warning and source discretisation.
  */
@@ -18,7 +20,7 @@
 #include "grid.h"
 #include "medium.h"
 #include "model.h"
-#include "signal.h"
+#include "waveform.h"
 #include "source.h"
 
 #include "test_util.h"
@@ -352,90 +354,28 @@ static void test_non_divisible_range(void)
     }
 }
 
-static void test_bad_grid_parameters(void)
+/* Grid-size limits that model_build() itself enforces (value ranges are
+ * config_load_*'s job and tested in test_config.c). */
+static void test_grid_size_errors(void)
 {
     SimConfig cfg;
     Model m;
     FdtdError err = {{0}};
-
-    cfg = base_config();
-    cfg.x_range[1] = cfg.x_range[0];
-    CHECK(model_build(&cfg, &m, &err) == -1);
-    CHECK_CONTAINS(err.msg, "lower < upper");
-
-    cfg = base_config();
-    cfg.dx = 0.0;
-    CHECK(model_build(&cfg, &m, &err) == -1);
-    CHECK_CONTAINS(err.msg, "dx must be a finite value > 0");
-
-    cfg = base_config();
-    cfg.dy = -0.005;
-    CHECK(model_build(&cfg, &m, &err) == -1);
-    CHECK_CONTAINS(err.msg, "dy must be a finite value > 0");
 
     /* shorter than one cell */
     cfg = base_config();
     cfg.x_range[1] = 0.001;
     CHECK(model_build(&cfg, &m, &err) == -1);
     CHECK_CONTAINS(err.msg, "smaller than one cell");
+    CHECK(m.solid == NULL);
 
-    /* duration must be positive */
+    /* more cells than an int can count */
     cfg = base_config();
-    cfg.duration = 0.0;
+    cfg.x_range[1] = 1e12; /* 2e11 cells of 5 mm */
+    err.msg[0] = '\0';
     CHECK(model_build(&cfg, &m, &err) == -1);
-    CHECK_CONTAINS(err.msg, "duration");
-
-    /* invalid medium */
-    cfg = base_config();
-    cfg.medium.density = 0.0;
-    CHECK(model_build(&cfg, &m, &err) == -1);
-    CHECK_CONTAINS(err.msg, "density");
-
-    /* a PML side needs at least one damping cell */
-    cfg = base_config();
-    cfg.pml.thickness = 0;
-    CHECK(model_build(&cfg, &m, &err) == -1);
-    CHECK_CONTAINS(err.msg, "boundary: x_min: pml thickness");
-
-    /* invalid R / order must not silently turn the PML into a rigid wall */
-    cfg = base_config();
-    cfg.pml.reflection = 0.0;
-    CHECK(model_build(&cfg, &m, &err) == -1);
-    CHECK_CONTAINS(err.msg, "pml reflection");
-    cfg = base_config();
-    cfg.pml.reflection = 1.5;
-    CHECK(model_build(&cfg, &m, &err) == -1);
-    CHECK_CONTAINS(err.msg, "pml reflection");
-    cfg = base_config();
-    cfg.pml.order = -1.0;
-    CHECK(model_build(&cfg, &m, &err) == -1);
-    CHECK_CONTAINS(err.msg, "pml order");
-    /* ... but they are irrelevant when no side is a PML */
-    cfg = base_config();
-    for (int s = 0; s < SIDE_COUNT; s++) {
-        cfg.boundary[s] = BC_RIGID;
-    }
-    cfg.pml.reflection = 0.0;
-    CHECK_MSG(model_build(&cfg, &m, &err) == 0, "%s", err.msg);
-    model_free(&m);
-
-    /* unknown boundary enum value */
-    cfg = base_config();
-    cfg.boundary[SIDE_Y_MAX] = (BoundaryType)99;
-    CHECK(model_build(&cfg, &m, &err) == -1);
-
-    /* inconsistent list/count pairs must be rejected, not crash */
-    cfg = base_config();
-    cfg.n_obstacles = 1;
-    cfg.obstacles = NULL;
-    CHECK(model_build(&cfg, &m, &err) == -1);
-    cfg = base_config();
-    cfg.n_sources = 1;
-    cfg.sources = NULL;
-    CHECK(model_build(&cfg, &m, &err) == -1);
-    cfg = base_config();
-    cfg.n_sources = -1;
-    CHECK(model_build(&cfg, &m, &err) == -1);
+    CHECK_CONTAINS(err.msg, "more than the supported maximum");
+    CHECK(m.solid == NULL);
 }
 
 static void test_timestep(void)
@@ -464,40 +404,26 @@ static void test_timestep(void)
     CHECK_CONTAINS(err.msg, "CFL");
     CHECK(m.dt == 0.0 && m.sources == NULL);
 
-    /* dt must be positive and finite */
-    cfg = base_config();
-    cfg.dt_set = true;
-    cfg.dt = 0.0;
-    err.msg[0] = '\0';
-    CHECK(model_build(&cfg, &m, &err) == -1);
-    CHECK_CONTAINS(err.msg, "dt must be a finite value > 0");
-
-    cfg = base_config();
-    cfg.dt_set = true;
-    cfg.dt = NAN;
-    err.msg[0] = '\0';
-    CHECK(model_build(&cfg, &m, &err) == -1);
-    CHECK_CONTAINS(err.msg, "dt must be a finite value > 0");
-
-    /* cfl must lie in (0, 1] */
-    cfg = base_config();
-    cfg.cfl = 0.0;
-    err.msg[0] = '\0';
-    CHECK(model_build(&cfg, &m, &err) == -1);
-    CHECK_CONTAINS(err.msg, "cfl");
-
-    cfg = base_config();
-    cfg.cfl = 1.5;
-    err.msg[0] = '\0';
-    CHECK(model_build(&cfg, &m, &err) == -1);
-    CHECK_CONTAINS(err.msg, "cfl");
-
     /* cfl = 1 is the stability limit and must be accepted */
     cfg = base_config();
     cfg.cfl = 1.0;
     CHECK_MSG(model_build(&cfg, &m, &err) == 0, "%s", err.msg);
     CHECK_NEAR(m.cfl, 1.0, 1e-12);
     model_free(&m);
+
+    /* Valid but extreme input: a very slow medium and huge cells give a
+     * finite, tiny denominator, so the derived dt overflows to inf. */
+    cfg = coarse_config();
+    cfg.medium.c = 1e-300;
+    cfg.x_range[1] = 1e10;
+    cfg.y_range[1] = 1e10;
+    cfg.dx = 1e10;
+    cfg.dy = 1e10;
+    set_point_source(&g_sources[0], 5e9, 5e9, 100.0, 1.0);
+    err.msg[0] = '\0';
+    CHECK(model_build(&cfg, &m, &err) == -1);
+    CHECK_CONTAINS(err.msg, "derived time step");
+    CHECK(m.dt == 0.0 && m.sources == NULL);
 }
 
 static void test_n_steps(void)
@@ -530,6 +456,13 @@ static void test_n_steps(void)
     CHECK(model_build(&cfg, &m, &err) == 0);
     CHECK_MSG(m.n_steps == 4, "n_steps = %ld", m.n_steps);
     model_free(&m);
+
+    /* a step count that does not fit in a long is rejected */
+    cfg.duration = 1e30;
+    err.msg[0] = '\0';
+    CHECK(model_build(&cfg, &m, &err) == -1);
+    CHECK_CONTAINS(err.msg, "too many steps");
+    CHECK(m.solid == NULL && m.medium_id == NULL);
 }
 
 /* --------------------------------------------------------- PML profiles */
@@ -754,15 +687,6 @@ static void test_obstacle_without_cell_centre_warns(void)
     CHECK_MSG(fdtd_warning_count() == 1, "%d warnings", fdtd_warning_count());
     CHECK(m.n_solid == 0);
     model_free(&m);
-
-    /* an invalid obstacle shape is reported with the obstacle index */
-    cfg = base_config();
-    set_rect_obstacle(0, 0.4, 0.4, 0.4, 0.6); /* zero width */
-    cfg.n_obstacles = 1;
-    err.msg[0] = '\0';
-    CHECK(model_build(&cfg, &m, &err) == -1);
-    CHECK_CONTAINS(err.msg, "obstacle[0]");
-    CHECK(m.solid == NULL);
 }
 
 /* ------------------------------------------------- warnings / error paths */
@@ -949,7 +873,7 @@ int main(void)
     RUN_TEST(test_build_default_pml);
     RUN_TEST(test_build_per_side_pml);
     RUN_TEST(test_non_divisible_range);
-    RUN_TEST(test_bad_grid_parameters);
+    RUN_TEST(test_grid_size_errors);
     RUN_TEST(test_timestep);
     RUN_TEST(test_n_steps);
     RUN_TEST(test_sigma_profiles);

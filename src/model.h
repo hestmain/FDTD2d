@@ -56,13 +56,19 @@ typedef struct Model {
     int n_sources;
 } Model;
 
-/* Build the model. Checks, in addition to SimConfig's own validation:
+/* Build the model.
+ * Precondition: `cfg` and `m` are non-NULL and `cfg` was produced by
+ * config_load_* (or satisfies the same constraints: finite, ordered ranges,
+ * dx, dy, duration, dt > 0, 0 < cfl <= 1, valid boundary enums, PML
+ * parameters, medium, shapes and signals, consistent list/count pairs).
+ * model_build() does not re-validate any of that; it only checks what
+ * depends on the grid:
  *  - (x1-x0)/dx and (y1-y0)/dy are integers within 1e-6 relative
  *    tolerance (error names the axis and suggests a nearest valid step);
  *  - total cell counts fit in int and nx*ny fits in size_t;
  *  - dt: if cfg->dt_set, cfl = c_max*dt*sqrt(1/dx^2+1/dy^2) must be <= 1
  *    (error otherwise); else dt = cfg->cfl / (c_max*sqrt(1/dx^2+1/dy^2));
- *    n_steps = max(1, ceil(duration/dt - 1e-9));
+ *    n_steps = max(1, ceil(duration/dt - 1e-9)), error if it overflows;
  *  - warning if c_min / (f_max * max(dx,dy)) < MODEL_MIN_POINTS_PER_WAVELENGTH;
  *  - obstacles: cells (including PML cells) whose centre is inside are
  *    solid; warning if an obstacle covers no cell centre;

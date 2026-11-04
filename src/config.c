@@ -52,16 +52,13 @@ static void cfg_error_at(ParseCtx *ctx, int line, const char *path, const char *
 /* Set "<source>:<line>: <path>: <problem>"; the line is omitted when unknown. */
 static void cfg_error_at(ParseCtx *ctx, int line, const char *path, const char *fmt, ...)
 {
-    if (!ctx->err) {
-        return;
-    }
     char problem[512];
     va_list ap;
     va_start(ap, fmt);
     vsnprintf(problem, sizeof problem, fmt, ap);
     va_end(ap);
 
-    bool has_path = path && path[0] != '\0';
+    bool has_path = path[0] != '\0';
     if (has_path && line > 0) {
         fdtd_error_set(ctx->err, "%s:%d: %s: %s", ctx->source_name, line, path, problem);
     } else if (has_path) {
@@ -76,9 +73,6 @@ static void cfg_error_at(ParseCtx *ctx, int line, const char *path, const char *
 /* Turn a message from a *_validate() helper into "<source>:<line>: <path>: msg". */
 static void cfg_locate_error(ParseCtx *ctx, int line, const char *path)
 {
-    if (!ctx->err) {
-        return;
-    }
     if (line > 0) {
         fdtd_error_prefix(ctx->err, "%s:%d: %s", ctx->source_name, line, path);
     } else {
@@ -124,9 +118,7 @@ static void path_index(char *buf, size_t cap, const char *base, int index)
 
 static bool table_lookup(const toml_datum_t *tab, const char *key, toml_datum_t *out)
 {
-    if (tab->type != TOML_TABLE) {
-        return false;
-    }
+    /* Precondition: tab is a TOML_TABLE (every caller type-checks first). */
     toml_datum_t d = toml_get(*tab, key);
     if (d.type == TOML_UNKNOWN) {
         return false;
@@ -373,16 +365,13 @@ static int get_string(const toml_datum_t *tab, ParseCtx *ctx, const char *path,
     return FIELD_FOUND;
 }
 
-/* Look up an array of exactly two numbers. `line_out` may be NULL. */
+/* Look up an array of exactly two numbers. */
 static int get_number_pair(const toml_datum_t *tab, ParseCtx *ctx, const char *path,
-                           const char *key, double out[2], bool require_ordered, int *line_out)
+                           const char *key, double out[2], bool require_ordered)
 {
     toml_datum_t d;
     if (!table_lookup(tab, key, &d)) {
         return FIELD_MISSING;
-    }
-    if (line_out) {
-        *line_out = d.lineno;
     }
     if (d.type != TOML_ARRAY) {
         return type_error(ctx, path, key, &d, "an array of 2 numbers");
@@ -414,7 +403,7 @@ static int get_vec2(const toml_datum_t *tab, ParseCtx *ctx, const char *path,
                     const char *key, Vec2 *out)
 {
     double v[2];
-    int r = get_number_pair(tab, ctx, path, key, v, false, NULL);
+    int r = get_number_pair(tab, ctx, path, key, v, false);
     if (r == FIELD_FOUND) {
         out->x = v[0];
         out->y = v[1];
@@ -808,11 +797,11 @@ static int parse_grid(ParseCtx *ctx, const toml_datum_t *tab, SimConfig *cfg)
         return -1;
     }
     if (require_field(ctx, tab, path, "x_range",
-                      get_number_pair(tab, ctx, path, "x_range", cfg->x_range, true, NULL)) != 0) {
+                      get_number_pair(tab, ctx, path, "x_range", cfg->x_range, true)) != 0) {
         return -1;
     }
     if (require_field(ctx, tab, path, "y_range",
-                      get_number_pair(tab, ctx, path, "y_range", cfg->y_range, true, NULL)) != 0) {
+                      get_number_pair(tab, ctx, path, "y_range", cfg->y_range, true)) != 0) {
         return -1;
     }
     if (require_field(ctx, tab, path, "dx",
@@ -1041,7 +1030,6 @@ static int parse_obstacles(ParseCtx *ctx, const toml_datum_t *arr, const char *n
             cfg_error_at(ctx, shape_line, spath,
                          "thin obstacles (%s) are not supported yet; use a rect, circle or polygon",
                          shape_type_name(shape->type));
-            shape_free(shape);
             return -1;
         }
     }
@@ -1091,7 +1079,6 @@ static int parse_sources(ParseCtx *ctx, const toml_datum_t *arr, const char *nam
                          "%s source shapes are not supported in this version; use a point or "
                          "a segment",
                          shape_type_name(src->shape.type));
-            shape_free(&src->shape);
             return -1;
         }
 
@@ -1203,7 +1190,6 @@ static int config_from_result(toml_result_t res, const char *source_name, SimCon
                               FdtdError *err)
 {
     ParseCtx ctx = {source_name, err};
-    memset(cfg, 0, sizeof *cfg);
     if (!res.ok) {
         fdtd_error_set(err, "%s: %s", source_name, res.errmsg);
         toml_free(res);
@@ -1229,35 +1215,18 @@ static int config_from_result(toml_result_t res, const char *source_name, SimCon
 
 int config_load_string(const char *text, const char *source_name, SimConfig *cfg, FdtdError *err)
 {
-    if (!cfg) {
-        fdtd_error_set(err, "config_load_string: cfg is NULL");
-        return -1;
-    }
     memset(cfg, 0, sizeof *cfg);
-    const char *name = source_name ? source_name : "<string>";
-    if (!text) {
-        fdtd_error_set(err, "%s: null document", name);
-        return -1;
-    }
     size_t len = strlen(text);
     if (len > (size_t)INT_MAX) {
-        fdtd_error_set(err, "%s: document too large", name);
+        fdtd_error_set(err, "%s: document too large", source_name);
         return -1;
     }
-    return config_from_result(toml_parse_named(text, (int)len, name), name, cfg, err);
+    return config_from_result(toml_parse_named(text, (int)len, source_name), source_name, cfg, err);
 }
 
 int config_load_file(const char *path, SimConfig *cfg, FdtdError *err)
 {
-    if (!cfg) {
-        fdtd_error_set(err, "config_load_file: cfg is NULL");
-        return -1;
-    }
     memset(cfg, 0, sizeof *cfg);
-    if (!path) {
-        fdtd_error_set(err, "config_load_file: path is NULL");
-        return -1;
-    }
     FILE *fp = fopen(path, "rb");
     if (!fp) {
         fdtd_error_set(err, "%s: cannot open file: %s", path, strerror(errno));
@@ -1273,12 +1242,10 @@ void config_free(SimConfig *cfg)
     if (!cfg) {
         return;
     }
-    int n_obstacles = cfg->n_obstacles > 0 ? cfg->n_obstacles : 0;
-    int n_sources = cfg->n_sources > 0 ? cfg->n_sources : 0;
-    for (int i = 0; i < n_obstacles; i++) {
+    for (int i = 0; i < cfg->n_obstacles; i++) {
         shape_free(&cfg->obstacles[i].shape);
     }
-    for (int i = 0; i < n_sources; i++) {
+    for (int i = 0; i < cfg->n_sources; i++) {
         shape_free(&cfg->sources[i].shape);
     }
     free(cfg->obstacles);

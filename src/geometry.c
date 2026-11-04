@@ -14,17 +14,11 @@ static const char *const k_shape_names[SHAPE_TYPE_COUNT] = {
 
 const char *shape_type_name(ShapeType type)
 {
-    if ((int)type < 0 || type >= SHAPE_TYPE_COUNT) {
-        return "unknown";
-    }
     return k_shape_names[type];
 }
 
 int shape_type_from_name(const char *name, ShapeType *out)
 {
-    if (!name) {
-        return -1;
-    }
     for (int t = 0; t < SHAPE_TYPE_COUNT; t++) {
         if (strcmp(name, k_shape_names[t]) == 0) {
             *out = (ShapeType)t;
@@ -213,8 +207,7 @@ void shape_free(Shape *s)
     if (s->type == SHAPE_POLYGON) {
         free(s->u.polygon.vertices);
     }
-    memset(s, 0, sizeof *s);
-    s->type = SHAPE_POINT;
+    memset(s, 0, sizeof *s); /* a zeroed Shape is an empty point (SHAPE_POINT == 0) */
 }
 
 /* Liang-Barsky: clip parameter range [t0,t1] of a + t (b - a). */

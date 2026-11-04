@@ -1,10 +1,12 @@
-# signal：声源时间函数
+# waveform：声源时间函数
 
-头文件：`src/signal.h`　实现：`src/signal.c`　依赖：common、libm
+头文件：`src/waveform.h`　实现：`src/waveform.c`　依赖：common、libm
 
 本模块描述声源随时间的变化 s(t)。声源 = 空间分布（由形状决定，见 source）× 时间函数（本模块）。两者相互独立，因此新增一种信号不影响点源、线源的实现。
 
 **v1 范围**：只实现简谐信号 `harmonic`。
+
+**命名**：文件原名 `signal.[ch]`，与系统头文件 `<signal.h>` 同名，而 `src` 是 PUBLIC include 目录，会遮蔽系统头文件，所以改为 `waveform.[ch]`。类型和函数仍叫 `Signal`、`signal_*`，TOML 键仍是 `signal`；这些名字不与系统头文件冲突。
 
 ## 简谐信号定义
 
@@ -68,7 +70,7 @@ const char *signal_type_name(SignalType type);
 int signal_type_from_name(const char *name, SignalType *out);
 ```
 
-在枚举和 TOML 名称之间转换，v1 只有 `"harmonic"`。用法与 `shape_type_from_name` 相同：成功返回 0，未知名称返回 -1。
+在枚举和 TOML 名称之间转换，v1 只有 `"harmonic"`。`signal_type_name` 的 `type` 必须是有效枚举值（小于 `SIGNAL_TYPE_COUNT`）。`signal_type_from_name` 的 `name` 不能为 `NULL`，用法与 `shape_type_from_name` 相同：成功返回 0，未知名称返回 -1。
 
 ### `signal_validate`
 

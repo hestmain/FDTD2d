@@ -1,5 +1,5 @@
 /*
- * signal.h - source time functions.
+ * waveform.h - source time functions (signals).
  *
  * Version 1 only implements the harmonic (time-harmonic, CW) signal:
  *
@@ -12,8 +12,8 @@
  * New time functions (Gaussian pulse, Ricker, tone burst, file input) are
  * added as new SignalType values plus a union member.
  */
-#ifndef FDTD2D_SIGNAL_H
-#define FDTD2D_SIGNAL_H
+#ifndef FDTD2D_WAVEFORM_H
+#define FDTD2D_WAVEFORM_H
 
 #include "common.h"
 
@@ -36,8 +36,9 @@ typedef struct Signal {
     } u;
 } Signal;
 
-/* "harmonic" */
+/* "harmonic". type must be a valid enumerator (< SIGNAL_TYPE_COUNT). */
 const char *signal_type_name(SignalType type);
+/* Returns 0 and sets *out if name (not NULL) is a known type name, else -1. */
 int signal_type_from_name(const char *name, SignalType *out);
 
 /* Range checks listed in the struct comments. */
@@ -50,4 +51,4 @@ double signal_eval(const Signal *s, double t);
  * points-per-wavelength check. Harmonic: f. */
 double signal_max_frequency(const Signal *s);
 
-#endif /* FDTD2D_SIGNAL_H */
+#endif /* FDTD2D_WAVEFORM_H */

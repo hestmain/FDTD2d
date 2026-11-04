@@ -13,9 +13,11 @@
  *                                           depth Q [m^2/s]
  *   segment : D = delta on the line;        s = volume velocity per unit
  *                                           length and depth Q' [m/s]
- * On the grid D becomes per-cell weights w_c [1/m^2] such that
- *   point   : sum_c w_c * dx * dy = 1
+ * On the grid D becomes per-cell weights w_c such that
+ *   point   : sum_c w_c * dx * dy = 1                          w_c [1/m^2]
  *   segment : sum_c w_c * dx * dy = (radiating) segment length [m]
+ *                                                              w_c [1/m]
+ * In both cases w_c * s has the unit of a volume source rate [1/s].
  */
 #ifndef FDTD2D_SOURCE_H
 #define FDTD2D_SOURCE_H
@@ -26,18 +28,23 @@
 #include "common.h"
 #include "geometry.h"
 #include "grid.h"
-#include "signal.h"
+#include "waveform.h"
 
 typedef struct ModelSource {
     ShapeType shape_type; /* where the distribution came from */
     Signal signal;
     size_t n_cells;
     size_t *cells;        /* cell indices (grid_cell_index), unique, fluid */
-    double *weights;      /* [1/m^2], > 0 */
+    double *weights;      /* > 0; [1/m^2] point, [1/m] segment */
 } ModelSource;
 
 /* Discretise `shape` on grid `g`. `solid` (nx*ny, nonzero = rigid) may be
- * NULL. Rules:
+ * NULL.
+ * Preconditions (not checked here; model_build() satisfies them): `shape`,
+ * `signal`, `g` and `out` are non-NULL; `g` has dx, dy > 0 and nx, ny >= 1;
+ * the shape and signal already passed shape_validate() / signal_validate()
+ * (config_load_* does this), so a segment has non-zero length.
+ * Rules:
  * Only PHYSICAL cells ever receive weight (never PML cells), so a source's
  * strength does not depend on the PML thickness.
  *  - point: must lie inside the closed physical domain, else error; error if
@@ -52,7 +59,8 @@ typedef struct ModelSource {
  *    dropped fraction, so the radiating length = clipped length minus the
  *    part on solid cells); error if nothing remains.
  *    Weight = length / (dx * dy). Cost is O(length / cell size).
- *  - area shapes: error "not supported in this version".
+ *  - any other shape (rect, circle, polygon): error "<shape> source is not
+ *    supported in this version".
  * On error *out is left zeroed. */
 int source_discretize(const Shape *shape, const Signal *signal, const Grid *g,
                       const uint8_t *solid, ModelSource *out, FdtdError *err);

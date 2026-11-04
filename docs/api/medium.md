@@ -47,7 +47,7 @@ typedef struct MediumTable {
 int medium_validate(const Medium *m, FdtdError *err);
 ```
 
-要求 `density` 和 `c` 都是大于 0 的有限值。失败返回 -1，错误信息例如 `density must be a finite value > 0 (got -1)`。
+要求 `density` 和 `c` 都是大于 0 的有限值。失败返回 -1，错误信息例如 `density must be a finite value > 0 (got -1)`。介质只在这里校验一次，由 `config_load_*` 调用；介质表的函数不会再校验。
 
 ### `medium_bulk_modulus`
 
@@ -63,7 +63,7 @@ double medium_bulk_modulus(const Medium *m);
 int medium_table_init(MediumTable *t, const Medium *background, FdtdError *err);
 ```
 
-先清零 `*t`，再把校验通过的背景介质放入第 0 项，`count = 1`。校验失败或内存不足时返回 -1，此时 `*t` 为全零。
+先清零 `*t`，再把背景介质放入第 0 项，`count = 1`。`background` 必须已通过 `medium_validate`（`config_load_*` 已经校验），本函数不再检查。内存不足时返回 -1，此时 `*t` 为全零。
 
 ### `medium_table_add`
 
@@ -71,7 +71,7 @@ int medium_table_init(MediumTable *t, const Medium *background, FdtdError *err);
 int medium_table_add(MediumTable *t, const Medium *m, FdtdError *err);
 ```
 
-校验后追加一种介质，返回它的编号（≥ 1）。校验失败、超过 `MEDIUM_MAX_COUNT` 或内存不足时返回 -1，表保持原样。v1 没有调用方，为介质区域预留。
+追加一种介质，返回它的编号（≥ 1）。`m` 必须已通过 `medium_validate`，本函数不再检查。超过 `MEDIUM_MAX_COUNT` 或内存不足时返回 -1，表保持原样。v1 没有调用方，为介质区域预留。
 
 ### `medium_table_c_max` / `medium_table_c_min`
 
@@ -80,7 +80,7 @@ double medium_table_c_max(const MediumTable *t);
 double medium_table_c_min(const MediumTable *t);
 ```
 
-返回表中所有介质的最大、最小声速；空表返回 0。用途：
+返回表中所有介质的最大、最小声速。表必须由 `medium_table_init` 初始化过（`count ≥ 1`）。用途：
 - 最大声速 c_max 决定 CFL 时间步长上限，也作为 PML 衰减剖面的参考声速。
 - 最小声速 c_min 决定最短波长，用于检查每波长网格点数。
 

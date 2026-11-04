@@ -25,9 +25,6 @@ double medium_bulk_modulus(const Medium *m)
 int medium_table_init(MediumTable *t, const Medium *background, FdtdError *err)
 {
     memset(t, 0, sizeof *t);
-    if (medium_validate(background, err) != 0) {
-        return -1;
-    }
     t->items = fdtd_calloc(1, sizeof *t->items, err);
     if (!t->items) {
         return -1;
@@ -39,9 +36,6 @@ int medium_table_init(MediumTable *t, const Medium *background, FdtdError *err)
 
 int medium_table_add(MediumTable *t, const Medium *m, FdtdError *err)
 {
-    if (medium_validate(m, err) != 0) {
-        return -1;
-    }
     if (t->count >= MEDIUM_MAX_COUNT) {
         fdtd_error_set(err, "too many media (max %d)", MEDIUM_MAX_COUNT);
         return -1;
@@ -71,7 +65,7 @@ double medium_table_c_min(const MediumTable *t)
     for (int k = 0; k < t->count; k++) {
         c = fmin(c, t->items[k].c);
     }
-    return t->count > 0 ? c : 0.0;
+    return c;
 }
 
 void medium_table_free(MediumTable *t)

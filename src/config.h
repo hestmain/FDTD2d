@@ -15,7 +15,7 @@
 #include "common.h"
 #include "geometry.h"
 #include "medium.h"
-#include "signal.h"
+#include "waveform.h"
 
 #define CONFIG_DEFAULT_CFL 0.7
 #define CONFIG_DEFAULT_OUTPUT_DIR "out"
@@ -75,13 +75,14 @@ typedef struct SimConfig {
     char *source_name;   /* owned; file name used in messages */
 } SimConfig;
 
-/* Parse and validate a TOML file. On success returns 0 and cfg owns all
- * memory (release with config_free). On failure returns -1, cfg is left
- * zeroed (nothing to free) and err holds "<file>:<line>: <key path>: ...". */
+/* Parse and validate a TOML file. path and cfg must not be NULL; err may be
+ * NULL. On success returns 0 and cfg owns all memory (release with
+ * config_free). On failure returns -1, cfg is left zeroed (nothing to free)
+ * and err holds "<file>:<line>: <key path>: ...". */
 int config_load_file(const char *path, SimConfig *cfg, FdtdError *err);
 
-/* Same as config_load_file for an in-memory document. source_name is used
- * in messages (may be NULL -> "<string>"). */
+/* Same as config_load_file for an in-memory document. text, source_name and
+ * cfg must not be NULL. source_name is used in messages (e.g. "<string>"). */
 int config_load_string(const char *text, const char *source_name, SimConfig *cfg, FdtdError *err);
 
 /* Release everything owned by cfg and zero it. Safe on a zeroed cfg. */

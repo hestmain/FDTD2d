@@ -19,82 +19,24 @@
 
 /* ----------------------------------------------------------------- setup */
 
-/* Reject models the solver cannot run, before anything is allocated. */
-static int check_model(const Model *m, FdtdError *err)
-{
-    if (!m) {
-        fdtd_error_set(err, "solver_init: no model given");
-        return -1;
-    }
-    const Grid *g = &m->grid;
-    if (g->nx < 1 || g->ny < 1) {
-        fdtd_error_set(err, "solver_init: grid %d x %d has no cells", g->nx, g->ny);
-        return -1;
-    }
-    if (!(isfinite(g->dx) && g->dx > 0.0 && isfinite(g->dy) && g->dy > 0.0)) {
-        fdtd_error_set(err, "solver_init: cell size dx = %g, dy = %g is not usable",
-                       g->dx, g->dy);
-        return -1;
-    }
-    if (!(isfinite(m->dt) && m->dt > 0.0)) {
-        fdtd_error_set(err, "solver_init: time step dt = %g is not usable", m->dt);
-        return -1;
-    }
-    if (!m->media.items || m->media.count < 1 || !m->medium_id) {
-        fdtd_error_set(err, "solver_init: model has no medium map");
-        return -1;
-    }
-    if (!m->sigma_x_cell || !m->sigma_x_face || !m->sigma_y_cell || !m->sigma_y_face) {
-        fdtd_error_set(err, "solver_init: model has no damping profiles");
-        return -1;
-    }
-    for (int s = 0; s < SIDE_COUNT; s++) {
-        if ((int)m->boundary[s] < 0 || m->boundary[s] >= BC_TYPE_COUNT) {
-            fdtd_error_set(err, "solver_init: unknown boundary type %d on side %s",
-                           (int)m->boundary[s], side_name((Side)s));
-            return -1;
-        }
-    }
-    const size_t nx = (size_t)g->nx;
-    const size_t ny = (size_t)g->ny;
-    if (nx > SIZE_MAX / (ny + 1) || ny > SIZE_MAX / (nx + 1)) {
-        fdtd_error_set(err, "solver_init: grid %d x %d is too large", g->nx, g->ny);
-        return -1;
-    }
-    if (m->n_sources < 0 || (m->n_sources > 0 && !m->sources)) {
-        fdtd_error_set(err, "solver_init: invalid source list (%d entries)", m->n_sources);
-        return -1;
-    }
-    const size_t n_cells = nx * ny;
-    for (int k = 0; k < m->n_sources; k++) {
-        const ModelSource *src = &m->sources[k];
-        if (src->n_cells > 0 && (!src->cells || !src->weights)) {
-            fdtd_error_set(err, "solver_init: source[%d] has no cell list", k);
-            return -1;
-        }
-        for (size_t n = 0; n < src->n_cells; n++) {
-            if (src->cells[n] >= n_cells) {
-                fdtd_error_set(err, "solver_init: source[%d] cell %zu is outside the grid",
-                               k, src->cells[n]);
-                return -1;
-            }
-        }
-    }
-    return 0;
-}
+/* Precondition of this file: *m comes from model_build() and outlives the
+ * solver, so grid, dt, medium map, damping tables, boundary enums and source
+ * cells are valid and are not re-checked. Checked here: allocation sizes, and
+ * K and sigma, which valid user input can still make unusable. */
 
 static bool cell_is_solid(const Model *m, size_t c)
 {
-    return m->solid != NULL && m->solid[c] != 0;
+    return m->solid[c] != 0;
 }
 
-/* Damping coefficients a, c for one axis from a sigma profile. */
+/* Damping coefficients a, c for one axis from a sigma profile. Extreme but
+ * valid PML parameters (e.g. a tiny cell size) can overflow sigma to inf. */
 static int fill_damping(double *a, double *c, const double *sigma, int n, double dt,
                         const char *what, FdtdError *err)
 {
     for (int i = 0; i < n; i++) {
         const double sg = sigma[i];
-        if (!(isfinite(sg) && sg >= 0.0)) {
+        if (!isfinite(sg)) {
             fdtd_error_set(err, "solver_init: %s damping %g at index %d is not usable",
                            what, sg, i);
             return -1;
@@ -120,11 +62,6 @@ static int compute_coefficients(Solver *s, const Model *m, FdtdError *err)
         if (cell_is_solid(m, c)) {
             s->kdt[c] = 0.0;
             continue;
-        }
-        if ((int)mid[c] >= m->media.count) {
-            fdtd_error_set(err, "solver_init: cell %zu uses medium %d but the table has %d",
-                           c, (int)mid[c], m->media.count);
-            return -1;
         }
         const double rho = med[mid[c]].density;
         const double K = medium_bulk_modulus(&med[mid[c]]);
@@ -189,23 +126,8 @@ static int compute_coefficients(Solver *s, const Model *m, FdtdError *err)
         fill_damping(s->ay_f, s->cy_f, m->sigma_y_face, ny + 1, dt, "y face", err) != 0) {
         return -1;
     }
-    /* Pressure-release sides have no PML: plain update on their outer faces. */
-    if (m->boundary[SIDE_X_MIN] == BC_PRESSURE_RELEASE) {
-        s->ax_f[0] = 1.0;
-        s->cx_f[0] = 1.0;
-    }
-    if (m->boundary[SIDE_X_MAX] == BC_PRESSURE_RELEASE) {
-        s->ax_f[nx] = 1.0;
-        s->cx_f[nx] = 1.0;
-    }
-    if (m->boundary[SIDE_Y_MIN] == BC_PRESSURE_RELEASE) {
-        s->ay_f[0] = 1.0;
-        s->cy_f[0] = 1.0;
-    }
-    if (m->boundary[SIDE_Y_MAX] == BC_PRESSURE_RELEASE) {
-        s->ay_f[ny] = 1.0;
-        s->cy_f[ny] = 1.0;
-    }
+    /* Pressure-release sides have no PML (sigma = 0 on their outer faces),
+     * so a = c = 1 there and the plain update applies. */
     return 0;
 }
 
@@ -235,11 +157,13 @@ void solver_free(Solver *s)
 int solver_init(Solver *s, const Model *m, FdtdError *err)
 {
     memset(s, 0, sizeof *s);
-    if (check_model(m, err) != 0) {
-        return -1;
-    }
     const size_t nx = (size_t)m->grid.nx;
     const size_t ny = (size_t)m->grid.ny;
+    if (nx > SIZE_MAX / (ny + 1) || ny > SIZE_MAX / (nx + 1)) {
+        fdtd_error_set(err, "solver_init: grid %d x %d is too large", m->grid.nx,
+                       m->grid.ny);
+        return -1;
+    }
     s->model = m;
     s->nx = m->grid.nx;
     s->ny = m->grid.ny;
@@ -363,9 +287,6 @@ static void update_release_faces(Solver *s)
 
 void solver_step(Solver *s)
 {
-    if (!s || !s->model || !s->px) {
-        return;
-    }
     const Model *m = s->model;
     const int nx = s->nx;
     const int ny = s->ny;
@@ -418,9 +339,6 @@ void solver_step(Solver *s)
 
 void solver_get_pressure(const Solver *s, double *out)
 {
-    if (!s || !s->px || !out) {
-        return;
-    }
     const size_t n = (size_t)s->nx * (size_t)s->ny;
     for (size_t c = 0; c < n; c++) {
         out[c] = s->px[c] + s->py[c];
@@ -429,17 +347,11 @@ void solver_get_pressure(const Solver *s, double *out)
 
 double solver_pressure_at(const Solver *s, size_t cell)
 {
-    if (!s || !s->px || cell >= (size_t)s->nx * (size_t)s->ny) {
-        return 0.0;
-    }
     return s->px[cell] + s->py[cell];
 }
 
 double solver_acoustic_energy(const Solver *s)
 {
-    if (!s || !s->model || !s->px) {
-        return 0.0;
-    }
     const Model *m = s->model;
     const size_t n_cells = (size_t)s->nx * (size_t)s->ny;
     const MediumId *mid = m->medium_id;
@@ -453,17 +365,33 @@ double solver_acoustic_energy(const Solver *s)
         }
     }
 
-    double kinetic = 0.0; /* sum rho_face v^2 / 2 over active faces */
-    const size_t n_xf = (size_t)(s->nx + 1) * (size_t)s->ny;
-    for (size_t f = 0; f < n_xf; f++) {
-        if (s->bx[f] > 0.0) {
-            kinetic += (m->dt / s->bx[f]) * s->vx[f] * s->vx[f];
+    /* sum w rho_face v^2 / 2 over active faces. The outer faces of
+     * pressure_release sides have half of their control volume outside the
+     * grid: weight 1/2 (the p0*v0 cross terms of the leapfrog energy balance
+     * cancel only with this weight). All other active faces have weight 1. */
+    const double w_xmin = m->boundary[SIDE_X_MIN] == BC_PRESSURE_RELEASE ? 0.5 : 1.0;
+    const double w_xmax = m->boundary[SIDE_X_MAX] == BC_PRESSURE_RELEASE ? 0.5 : 1.0;
+    const double w_ymin = m->boundary[SIDE_Y_MIN] == BC_PRESSURE_RELEASE ? 0.5 : 1.0;
+    const double w_ymax = m->boundary[SIDE_Y_MAX] == BC_PRESSURE_RELEASE ? 0.5 : 1.0;
+    double kinetic = 0.0;
+    const size_t fw = (size_t)s->nx + 1;
+    for (int j = 0; j < s->ny; j++) {
+        const size_t row = (size_t)j * fw;
+        for (size_t i = 0; i <= (size_t)s->nx; i++) {
+            const size_t f = row + i;
+            if (s->bx[f] > 0.0) {
+                const double w = i == 0 ? w_xmin : (i == (size_t)s->nx ? w_xmax : 1.0);
+                kinetic += w * (m->dt / s->bx[f]) * s->vx[f] * s->vx[f];
+            }
         }
     }
-    const size_t n_yf = (size_t)s->nx * (size_t)(s->ny + 1);
-    for (size_t f = 0; f < n_yf; f++) {
-        if (s->by[f] > 0.0) {
-            kinetic += (m->dt / s->by[f]) * s->vy[f] * s->vy[f];
+    for (int j = 0; j <= s->ny; j++) {
+        const size_t row = (size_t)j * (size_t)s->nx;
+        const double w = j == 0 ? w_ymin : (j == s->ny ? w_ymax : 1.0);
+        for (size_t i = 0; i < (size_t)s->nx; i++) {
+            if (s->by[row + i] > 0.0) {
+                kinetic += w * (m->dt / s->by[row + i]) * s->vy[row + i] * s->vy[row + i];
+            }
         }
     }
     return (potential + 0.5 * kinetic) * m->grid.dx * m->grid.dy;

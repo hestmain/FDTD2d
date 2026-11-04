@@ -31,7 +31,7 @@ typedef enum ShapeType {
 } ShapeType;
 ```
 
-`SHAPE_TYPE_COUNT` 不是有效类型，只用于遍历和边界检查。
+`SHAPE_TYPE_COUNT` 不是有效类型，只用于遍历和数组大小。
 
 ### `Shape`
 
@@ -69,7 +69,7 @@ const char *shape_type_name(ShapeType type);
 int shape_type_from_name(const char *name, ShapeType *out);
 ```
 
-在枚举和 TOML 类型名之间转换，类型名为 `"point" "segment" "rect" "circle" "polygon"`，区分大小写。`shape_type_name` 遇到非法值时返回 `"unknown"`。`shape_type_from_name` 匹配成功时返回 0 并写入 `*out`；未知名称或 `NULL` 返回 -1，此时不修改 `*out`。
+在枚举和 TOML 类型名之间转换，类型名为 `"point" "segment" "rect" "circle" "polygon"`，区分大小写。`shape_type_name` 的 `type` 必须是有效枚举值（小于 `SHAPE_TYPE_COUNT`）。`shape_type_from_name` 的 `name` 不能为 `NULL`；匹配成功时返回 0 并写入 `*out`，未知名称返回 -1，此时不修改 `*out`。
 
 ### `shape_is_area`
 

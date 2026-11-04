@@ -1,8 +1,10 @@
 # model：解析器第二层（SimConfig → 网格模型）
 
-头文件：`src/model.h`　实现：`src/model.c`　依赖：config（只读 `SimConfig` 结构体，不调用其函数）、grid、medium、boundary、geometry、signal、source、common
+头文件：`src/model.h`　实现：`src/model.c`　依赖：config（只读 `SimConfig` 结构体，不调用其函数）、grid、medium、boundary、geometry、waveform、source、common
 
 `model_build()` 把与网格无关的 `SimConfig` 转换成求解器可以直接使用的 `Model`。它负责所有与网格相关的检查和预计算：网格尺寸、时间步长、介质编号图、刚性障碍物掩码、PML 衰减剖面以及声源离散。solver 只读取 `Model`，不做任何几何或参数推导。
+
+**校验分工**：用户输入只在 config 层校验一次（`config_load_*`：取值范围、有限性、枚举、形状、PML 参数、介质、信号）。`model_build()` 不重复这些检查，只检查依赖网格的内容：域长度能否被 dx、dy 整除，单元数和步数是否溢出，`dt` 是否超过 CFL 上限，声源是否落在域外或障碍物内。
 
 ## 类型
 
@@ -49,9 +51,11 @@ int model_build(const SimConfig *cfg, Model *m, FdtdError *err);
 
 | 参数 | 说明 |
 |---|---|
-| `cfg` | 已通过 config 校验的配置（只读，调用后仍归调用方所有） |
-| `m` | 输出，会被先清零 |
+| `cfg` | 非 `NULL`，由 `config_load_*` 生成（或满足同样的约束）的配置，只读，调用后仍归调用方所有 |
+| `m` | 非 `NULL`，输出，会被先清零 |
 | `err` | 错误信息，可为 `NULL` |
+
+前提：`cfg` 满足 config 校验后的全部约束，包括 x_range、y_range 有限且上界大于下界，dx、dy、duration、dt 为有限正数，`0 < cfl ≤ 1`，边界类型是合法枚举，PML 参数合法，介质、形状和信号合法，列表与个数一致。`model_build()` 不检查这些，传入不满足约束的配置属于未定义行为。
 
 成功返回 0，`m` 拥有全部内存，用 `model_free` 释放。失败返回 -1，此时 `*m` 为全零，不需要释放。`cfg` 中的数据会被复制或转换，`Model` 不引用 `cfg` 的内存，因此可以在 `model_build` 之后立即 `config_free(cfg)`。
 
@@ -64,7 +68,8 @@ int model_build(const SimConfig *cfg, Model *m, FdtdError *err);
   ```
   grid: x_range length 2.003 is not a multiple of dx = 0.005 (nearest valid dx: 0.00499501)
   ```
-- PML 侧各增加 `pml.thickness` 层，非 PML 侧为 0。只要有一侧是 PML，就用 `pml_params_validate` 检查 PML 参数。这样非法的 R 或 m 会直接报错，而不会让 σ 全为 0、PML 悄悄变成刚性壁。
+- 若 `(x1−x0)/dx` 超过 `INT_MAX`，或不足一个单元，同样报错。
+- PML 侧各增加 `pml.thickness` 层，非 PML 侧为 0。PML 参数（厚度、R、m）已由 config 校验，这里直接使用。
 - 总单元数 `nx = off_x + nx_phys + pml_cells[x_max]`，y 方向同理；`nx+1` 和 `ny+1` 必须在 `int` 范围内，`nx·ny` 必须在 `size_t` 范围内。
 
 **2. 介质**
@@ -78,10 +83,10 @@ int model_build(const SimConfig *cfg, Model *m, FdtdError *err);
 
 | 配置 | 结果 |
 |---|---|
-| 未给 `dt` | `dt = cfl / S`，cfl 默认 0.7 |
+| 未给 `dt` | `dt = cfl / S`，cfl 默认 0.7。极慢介质配合极大单元时 S 很小但有限，`dt` 会上溢为无穷，此时报错 `simulation: the derived time step ... overflows` |
 | 给了 `dt` | 实际 `cfl = dt·S`；若大于 1 则报错并给出 dt 的上限 |
 
-步数 `n_steps = max(1, ceil(duration/dt − 1e-9))`，实际仿真时长为 `n_steps·dt`，不小于请求的 `duration`。
+步数 `n_steps = max(1, ceil(duration/dt − 1e-9))`，实际仿真时长为 `n_steps·dt`，不小于请求的 `duration`。步数超过 `long` 范围时报错。
 
 二维交错网格 leapfrog 格式的稳定条件是 `cfl ≤ 1`。dx = dy 时等价于 `c·dt/dx ≤ 1/√2`。
 
@@ -133,7 +138,7 @@ void model_free(Model *m);
 void model_print_summary(FILE *out, const Model *m);
 ```
 
-输出多行可读的模型摘要，`fdtd2d --check` 和输出目录下的 `summary.txt` 都使用它。下面是 `fdtd2d --check examples/point_source_free_field.toml` 的实际输出：
+输出多行可读的模型摘要，`out` 和 `m` 必须非 `NULL`。`fdtd2d --check` 和输出目录下的 `summary.txt` 都使用它。下面是 `fdtd2d --check examples/point_source_free_field.toml` 的实际输出：
 
 ```
 grid:  400 x 300 cells physical, 440 x 340 cells total (incl. PML)

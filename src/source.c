@@ -31,17 +31,15 @@ static double axis_position(double x, double x0, double h, int off, int n_phys)
     return f;
 }
 
-/* Lower neighbour index and interpolation fraction along one axis. With
- * n_phys >= 2 the index is limited to off + n_phys - 2 so that i+1 stays a
- * physical cell; the resulting fraction is always in [0, 1]. */
+/* Lower neighbour index and interpolation fraction along one axis. `f` comes
+ * from axis_position(), so f >= off and floor(f) >= off. With n_phys >= 2 the
+ * index is limited to off + n_phys - 2 so that i+1 stays a physical cell; the
+ * resulting fraction is always in [0, 1]. */
 static int axis_bracket(double f, int off, int n_phys, double *t)
 {
     int i0 = (int)floor(f);
     if (n_phys >= 2 && i0 > off + n_phys - 2) {
         i0 = off + n_phys - 2;
-    }
-    if (i0 < off) {
-        i0 = off;
     }
     *t = f - (double)i0;
     return i0;
@@ -162,12 +160,11 @@ static int discretize_point(const Shape *shape, const Signal *signal, const Grid
             n++;
         }
     }
-    if (n == 0) {
-        fdtd_error_set(err, "point (%g, %g) touches rigid cells only", p.x, p.y);
-        return -1;
-    }
 
-    /* Renormalise the surviving weights to sum 1, then convert to a
+    /* n >= 1: the physical cell containing the point is fluid (checked above
+     * when `solid` is given) and is one of the bracketing cells with bilinear
+     * weight >= 0.25, far above SOURCE_MIN_WEIGHT.
+     * Renormalise the surviving weights to sum 1, then convert to a
      * density [1/m^2] (sum_c w_c dx dy = 1). */
     double sum = 0.0;
     for (size_t k = 0; k < n; k++) {
@@ -197,10 +194,6 @@ static int discretize_segment(const Shape *shape, const Signal *signal, const Gr
     const Vec2 a = shape->u.segment.start;
     const Vec2 b = shape->u.segment.end;
     const double orig = hypot(b.x - a.x, b.y - a.y);
-    if (!(orig > 0.0)) {
-        fdtd_error_set(err, "segment has zero length");
-        return -1;
-    }
 
     const Vec2 bmin = {g->x0, g->y0};
     const Vec2 bmax = {grid_x1(g), grid_y1(g)};
@@ -328,15 +321,6 @@ int source_discretize(const Shape *shape, const Signal *signal, const Grid *g,
                       const uint8_t *solid, ModelSource *out, FdtdError *err)
 {
     memset(out, 0, sizeof *out);
-    if (!shape || !signal || !g) {
-        fdtd_error_set(err, "source_discretize: missing shape, signal or grid");
-        return -1;
-    }
-    if (!(g->dx > 0.0) || !(g->dy > 0.0) || g->nx < 1 || g->ny < 1) {
-        fdtd_error_set(err, "source_discretize: invalid grid (%d x %d, dx = %g, dy = %g)",
-                       g->nx, g->ny, g->dx, g->dy);
-        return -1;
-    }
 
     int rc;
     switch (shape->type) {
@@ -346,16 +330,9 @@ int source_discretize(const Shape *shape, const Signal *signal, const Grid *g,
     case SHAPE_SEGMENT:
         rc = discretize_segment(shape, signal, g, solid, out, err);
         break;
-    case SHAPE_RECT:
-    case SHAPE_CIRCLE:
-    case SHAPE_POLYGON:
+    default: /* area shapes */
         fdtd_error_set(err, "%s source is not supported in this version",
                        shape_type_name(shape->type));
-        rc = -1;
-        break;
-    case SHAPE_TYPE_COUNT:
-    default:
-        fdtd_error_set(err, "unknown source shape type %d", (int)shape->type);
         rc = -1;
         break;
     }

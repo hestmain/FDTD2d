@@ -84,8 +84,6 @@ static void test_name_type_conversions(void)
     CHECK(strcmp(shape_type_name(SHAPE_RECT), "rect") == 0);
     CHECK(strcmp(shape_type_name(SHAPE_CIRCLE), "circle") == 0);
     CHECK(strcmp(shape_type_name(SHAPE_POLYGON), "polygon") == 0);
-    CHECK(strcmp(shape_type_name((ShapeType)SHAPE_TYPE_COUNT), "unknown") == 0);
-    CHECK(strcmp(shape_type_name((ShapeType)-1), "unknown") == 0);
 
     for (int t = 0; t < SHAPE_TYPE_COUNT; t++) {
         const char *name = shape_type_name((ShapeType)t);
@@ -99,7 +97,6 @@ static void test_name_type_conversions(void)
     CHECK(shape_type_from_name("hexagon", &out) == -1);
     CHECK(shape_type_from_name("Point", &out) == -1); /* case sensitive */
     CHECK(shape_type_from_name("", &out) == -1);
-    CHECK(shape_type_from_name(NULL, &out) == -1);
 }
 
 static void test_is_area(void)

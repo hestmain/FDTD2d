@@ -1,6 +1,6 @@
 # config：解析器第一层（TOML → SimConfig）
 
-头文件：`src/config.h`　实现：`src/config.c`　依赖：tomlc17（第三方）、geometry、signal、boundary、medium、common
+头文件：`src/config.h`　实现：`src/config.c`　依赖：tomlc17（第三方）、geometry、waveform、boundary、medium、common
 
 config 读取 TOML 配置文件，经过校验后生成 `SimConfig` 纯数据结构。`SimConfig` 只记录用户写的内容和默认值，不涉及网格；凡是需要网格才能做的检查都交给 model，例如域长能否被 dx 整除、CFL 上限、声源是否在域内。
 
@@ -99,7 +99,7 @@ PML 层加在物理域外侧，不占用 `x_range` 和 `y_range`。
 | `directory` | 字符串 | `"out"` | 非空 | 输出目录，不存在时自动创建；命令行 `-o` 可覆盖 |
 | `every` | 整数 | 10 | ≥ 1 | 每 N 步输出一帧，最后一步总会输出 |
 | `color_limit` | `"auto"` 或数值 | `"auto"` | 数值 > 0 | 色标范围 [Pa]；`"auto"` 表示每帧取 ±max\|p\| |
-| `show_pml` | 布尔 | false | | 是否绘出 PML 区域，绘出时用黑框标出物理域 |
+| `show_pml` | 布尔 | false | | 是否绘出 PML 区域，绘出时用黑框标出物理域（没有 PML 侧时不画黑框） |
 | `pixel_scale` | 整数 | 1 | 1..16 | 每个单元绘成的像素边长 |
 
 完整示例见 `examples/point_source_free_field.toml` 和 `examples/line_source_obstacles.toml`。
@@ -142,7 +142,7 @@ typedef struct SimConfig {
 int config_load_file(const char *path, SimConfig *cfg, FdtdError *err);
 ```
 
-读取并校验 TOML 文件。成功返回 0，`cfg` 拥有全部内存。失败返回 -1，`cfg` 为全零，不需要释放。
+读取并校验 TOML 文件。`path` 和 `cfg` 不能为 `NULL`，`err` 可以为 `NULL`。成功返回 0，`cfg` 拥有全部内存。失败返回 -1，`cfg` 为全零，不需要释放。
 
 错误信息为单行，格式是 `<文件>:<行号>: <键路径>: <问题>`。行号未知时省略。数组下标从 0 开始。以下是实际输出：
 
@@ -170,7 +170,7 @@ case.toml: source[0]: point (5, 1) is outside the physical domain [0, 1] x [0, 1
 int config_load_string(const char *text, const char *source_name, SimConfig *cfg, FdtdError *err);
 ```
 
-功能同上，从内存字符串读取。`source_name` 只用于错误信息，为 `NULL` 时显示为 `<string>`。这个函数主要用于测试。
+功能同上，从内存字符串读取。`text`、`source_name` 和 `cfg` 都不能为 `NULL`。`source_name` 只用于错误信息，例如传入 `"<string>"`。这个函数主要用于测试。
 
 ### `config_free`
 
@@ -196,6 +196,6 @@ config_free(&cfg);
 
 ## 扩展方式
 
-- **新形状或新信号**：先在 geometry 或 signal 中实现，再在本模块的形状、信号解析函数中加一个分支，写明该类型允许的键和读取方式。
+- **新形状或新信号**：先在 geometry 或 waveform 中实现，再在本模块的形状、信号解析函数中加一个分支，写明该类型允许的键和读取方式。
 - **介质区域**：增加 `[[medium_region]]` 数组表，每项包含 shape、density 和 c；在 `SimConfig` 中加上对应的数组；然后由 model 把区域写入 `medium_id`。
 - **新的顶层表**（如接收点 `[[probe]]`）：在顶层键白名单中登记，再增加对应的解析函数。

@@ -167,7 +167,6 @@ static int run(const CliOptions *cli, FdtdError *err)
     SimConfig cfg;
     Model model;
     Solver solver;
-    memset(&model, 0, sizeof model);
     memset(&solver, 0, sizeof solver);
     double *pressure = NULL;
     FILE *index = NULL;
@@ -182,6 +181,22 @@ static int run(const CliOptions *cli, FdtdError *err)
     }
     model_print_summary(stdout, &model);
     fflush(stdout);
+    /* The frame size only depends on the grid and [output]: reject an
+     * image the PNG writer cannot produce before anything is written
+     * (also in --check mode). */
+    {
+        const Grid *gg = &model.grid;
+        const long long img_w = (long long)(cfg.output.show_pml ? gg->nx : gg->nx_phys) *
+                                cfg.output.pixel_scale;
+        const long long img_h = (long long)(cfg.output.show_pml ? gg->ny : gg->ny_phys) *
+                                cfg.output.pixel_scale;
+        if (img_w > 65535 || img_h > 65535) {
+            fdtd_error_set(err, "%s: output: frames would be %lld x %lld pixels, above the "
+                           "PNG limit of 65535; reduce pixel_scale",
+                           cli->config_path, img_w, img_h);
+            goto done;
+        }
+    }
     if (cli->check_only) {
         rc = 0;
         goto done;
@@ -242,7 +257,6 @@ static int run(const CliOptions *cli, FdtdError *err)
         field.w = g->nx_phys;
         field.h = g->ny_phys;
     }
-
     const long n_steps = model.n_steps;
     const int every = cfg.output.every;
     const int digits = count_digits(n_steps) > 6 ? count_digits(n_steps) : 6;
@@ -264,8 +278,10 @@ static int run(const CliOptions *cli, FdtdError *err)
                 }
             }
             char name[64];
+            /* The name is at most 25 chars; the length test only lets the compiler
+             * see that truncation is handled (-Wformat-truncation). */
             int name_len = snprintf(name, sizeof name, "p_%0*ld.png", digits, n);
-            if (name_len < 0 || name_len >= (int)sizeof name ||
+            if (name_len >= (int)sizeof name ||
                 snprintf(path, sizeof path, "%s/%s", out_dir, name) >= (int)sizeof path) {
                 fdtd_error_set(err, "output path too long");
                 goto done;
