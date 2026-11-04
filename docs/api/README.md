@@ -1,38 +1,26 @@
 # fdtd2d API 文档总览
 
-fdtd2d 是一个 C11 编写的二维声场 FDTD 仿真工具：无黏性理想流体、静止介质、线性声学。本目录按模块逐一说明公开 API。各模块的头文件（`src/*.h`）是接口契约；本文档与头文件不一致时以头文件为准，并应当修正文档。
+fdtd2d 是一个 C11 编写的二维声场 FDTD 仿真工具：无黏性理想流体、静止介质、线性声学。本目录按模块逐一说明公开 API。各模块的头文件（`headers/*.h`）是接口契约；本文档与头文件不一致时以头文件为准，并应当修正文档。
+
+使用方法见 [使用手册](../manual.md)，数值方法见 [原理说明](../theory.md)。
 
 ## 模块分层
 
-```
-                 main.c (命令行)
-                     │
-  ┌──────────────────┼──────────────────────┐
-  │ 解析器            │ 求解器               │ 渲染器
-  │ config  → model  │ solver               │ render
-  │  (TOML)  (网格化) │ (时间推进)           │ (PNG 热力图)
-  └────┬─────────┬───┴──────────┬───────────┘
-       │         │              │
-       │      source (声源离散)  │
-       │         │              │
-  geometry  medium  waveform  boundary  grid     ← 基础模块
-                     │
-                  common (错误、警告、内存)
-```
+![fdtd2d 模块图](../images/modules.svg)
 
-| 模块 | 文件 | 作用 | 文档 |
+| 模块 | 头文件 / 实现 | 作用 | 文档 |
 |---|---|---|---|
-| common | `src/common.[ch]` | 错误信息、警告、内存分配辅助 | [common.md](common.md) |
-| geometry | `src/geometry.[ch]` | 与网格无关的二维形状 | [geometry.md](geometry.md) |
-| grid | `src/grid.h` | 交错网格布局与索引换算（仅头文件） | [grid.md](grid.md) |
-| medium | `src/medium.[ch]` | 介质参数与介质表 | [medium.md](medium.md) |
-| waveform | `src/waveform.[ch]` | 声源时间函数（v1：简谐） | [waveform.md](waveform.md) |
-| boundary | `src/boundary.[ch]` | 外边界类型与 PML 参数 | [boundary.md](boundary.md) |
-| config | `src/config.[ch]` | 解析器第一层：TOML → `SimConfig` | [config.md](config.md) |
-| source | `src/source.[ch]` | 声源空间离散 | [source.md](source.md) |
-| model | `src/model.[ch]` | 解析器第二层：`SimConfig` → 网格模型 | [model.md](model.md) |
-| solver | `src/solver.[ch]` | FDTD 时间推进 | [solver.md](solver.md) |
-| render | `src/render.[ch]` | 热力图 PNG 输出 | [render.md](render.md) |
+| common | `headers/common.h`、`src/common.c` | 错误信息、警告、内存分配辅助 | [common.md](common.md) |
+| geometry | `headers/geometry.h`、`src/geometry.c` | 与网格无关的二维形状 | [geometry.md](geometry.md) |
+| grid | `headers/grid.h` | 交错网格布局与索引换算（仅头文件） | [grid.md](grid.md) |
+| medium | `headers/medium.h`、`src/medium.c` | 介质参数与介质表 | [medium.md](medium.md) |
+| waveform | `headers/waveform.h`、`src/waveform.c` | 声源时间函数（v1：简谐） | [waveform.md](waveform.md) |
+| boundary | `headers/boundary.h`、`src/boundary.c` | 外边界类型与 PML 参数 | [boundary.md](boundary.md) |
+| config | `headers/config.h`、`src/config.c` | 解析器第一层：TOML → `SimConfig` | [config.md](config.md) |
+| source | `headers/source.h`、`src/source.c` | 声源空间离散 | [source.md](source.md) |
+| model | `headers/model.h`、`src/model.c` | 解析器第二层：`SimConfig` → 网格模型 | [model.md](model.md) |
+| solver | `headers/solver.h`、`src/solver.c` | FDTD 时间推进 | [solver.md](solver.md) |
+| render | `headers/render.h`、`src/render.c` | 热力图 PNG 输出 | [render.md](render.md) |
 
 依赖只能自上而下：基础模块互不依赖（只依赖 common），renderer 不依赖 model，也不依赖 solver。
 
@@ -55,8 +43,6 @@ fdtd2d 是一个 C11 编写的二维声场 FDTD 仿真工具：无黏性理想�
 **线程安全**：v1 为单线程。`common` 中的警告计数和警告输出流是进程级全局状态。
 
 ## 构建
-
-本机运行在 AppImage 环境中，会泄露 `LD_LIBRARY_PATH` 等变量，导致系统 cmake 加载到错误的 libarchive。构建前先清除这些变量（fish）：
 
 ```fish
 set -e LD_LIBRARY_PATH; set -e PYTHONHOME; set -e PYTHONPATH

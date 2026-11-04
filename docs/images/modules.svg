@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="660" viewBox="0 0 1100 660">
+  <title>fdtd2d 模块图</title>
+  <defs>
+    <marker id="dep" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9"
+            markerUnits="userSpaceOnUse" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7a7a7a"/>
+    </marker>
+    <marker id="data" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10"
+            markerUnits="userSpaceOnUse" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2f6fd0"/>
+    </marker>
+    <style>
+      text { font-family: "Noto Sans CJK SC", "Noto Sans SC", "Source Han Sans SC", "Microsoft YaHei", sans-serif; fill: #222; }
+      .name { font-family: "DejaVu Sans Mono", Consolas, "Courier New", monospace; font-size: 15px; font-weight: bold; }
+      .desc { font-size: 12px; fill: #555; }
+      .group { font-size: 13px; font-weight: bold; }
+      .label { font-family: "DejaVu Sans Mono", Consolas, monospace; font-size: 11px; fill: #2f6fd0; }
+      .note { font-size: 12px; fill: #555; }
+      .box { fill: #fff; stroke-width: 1.5; }
+      .dep { stroke: #7a7a7a; stroke-width: 1.5; fill: none; marker-end: url(#dep); }
+      .data { stroke: #2f6fd0; stroke-width: 2.2; fill: none; marker-end: url(#data); }
+    </style>
+  </defs>
+
+  <rect width="1100" height="660" fill="#ffffff"/>
+  <text x="550" y="34" text-anchor="middle" style="font-size:20px;font-weight:bold">fdtd2d 模块图</text>
+
+  <!-- main.c -->
+  <rect class="box" x="430" y="58" width="240" height="54" rx="6" stroke="#333"/>
+  <text class="name" x="550" y="80" text-anchor="middle">main.c</text>
+  <text class="desc" x="550" y="100" text-anchor="middle">命令行：依次调用各模块，写出结果</text>
+
+  <!-- main.c calls the three groups -->
+  <path class="dep" d="M550,112 V132 H310 V150"/>
+  <path class="dep" d="M550,132 H625 V150"/>
+  <path class="dep" d="M625,132 H860 V150"/>
+
+  <!-- group: parser -->
+  <rect x="150" y="150" width="320" height="190" rx="8" fill="#eef4fb" stroke="#4a78b5" stroke-dasharray="6 4"/>
+  <text class="group" x="162" y="171" fill="#4a78b5">解析器</text>
+  <rect class="box" x="165" y="185" width="105" height="60" rx="6" stroke="#4a78b5"/>
+  <text class="name" x="217" y="210" text-anchor="middle">config</text>
+  <text class="desc" x="217" y="230" text-anchor="middle">读取并校验配置</text>
+  <rect class="box" x="345" y="185" width="115" height="60" rx="6" stroke="#4a78b5"/>
+  <text class="name" x="402" y="210" text-anchor="middle">model</text>
+  <text class="desc" x="402" y="230" text-anchor="middle">网格化</text>
+  <rect class="box" x="345" y="268" width="115" height="56" rx="6" stroke="#4a78b5"/>
+  <text class="name" x="402" y="291" text-anchor="middle">source</text>
+  <text class="desc" x="402" y="310" text-anchor="middle">声源离散</text>
+  <path class="dep" d="M402,245 V268"/>
+
+  <!-- group: solver -->
+  <rect x="545" y="150" width="160" height="190" rx="8" fill="#eef8ef" stroke="#3c8d52" stroke-dasharray="6 4"/>
+  <text class="group" x="557" y="171" fill="#3c8d52">求解器</text>
+  <rect class="box" x="560" y="185" width="130" height="60" rx="6" stroke="#3c8d52"/>
+  <text class="name" x="625" y="210" text-anchor="middle">solver</text>
+  <text class="desc" x="625" y="230" text-anchor="middle">FDTD 时间推进</text>
+
+  <!-- group: renderer -->
+  <rect x="780" y="150" width="160" height="190" rx="8" fill="#fdf3e7" stroke="#c9822b" stroke-dasharray="6 4"/>
+  <text class="group" x="792" y="171" fill="#c9822b">渲染器</text>
+  <rect class="box" x="795" y="185" width="130" height="60" rx="6" stroke="#c9822b"/>
+  <text class="name" x="860" y="210" text-anchor="middle">render</text>
+  <text class="desc" x="860" y="230" text-anchor="middle">声压热力图 PNG</text>
+
+  <!-- input / output files -->
+  <path d="M20,185 H105 L120,200 V245 H20 Z" fill="#fff" stroke="#333" stroke-width="1.5"/>
+  <path d="M105,185 V200 H120" fill="none" stroke="#333" stroke-width="1.5"/>
+  <text class="name" x="68" y="212" text-anchor="middle" style="font-size:13px">case.toml</text>
+  <text class="desc" x="68" y="232" text-anchor="middle">配置文件</text>
+
+  <path d="M970,175 H1065 L1080,190 V255 H970 Z" fill="#fff" stroke="#333" stroke-width="1.5"/>
+  <path d="M1065,175 V190 H1080" fill="none" stroke="#333" stroke-width="1.5"/>
+  <text class="name" x="1023" y="200" text-anchor="middle" style="font-size:12px">p_*.png</text>
+  <text class="name" x="1023" y="220" text-anchor="middle" style="font-size:12px">frames.csv</text>
+  <text class="name" x="1023" y="240" text-anchor="middle" style="font-size:12px">summary.txt</text>
+
+  <!-- data flow -->
+  <path class="data" d="M120,215 H165"/>
+  <path class="data" d="M270,215 H345"/>
+  <text class="label" x="307" y="207" text-anchor="middle">SimConfig</text>
+  <path class="data" d="M460,215 H560"/>
+  <text class="label" x="507" y="207" text-anchor="middle">Model</text>
+  <path class="data" d="M690,215 H795"/>
+  <text class="label" x="742" y="207" text-anchor="middle">声压 p</text>
+  <path class="data" d="M925,215 H970"/>
+
+  <!-- dependencies to the foundation, third party -->
+  <path class="dep" d="M300,340 V390"/>
+  <path class="dep" d="M625,340 V390"/>
+  <path class="dep" d="M190,340 V370 H70 V415"/>
+  <path class="dep" d="M900,340 V370 H1025 V415"/>
+
+  <!-- third party -->
+  <rect class="box" x="20" y="415" width="100" height="50" rx="6" stroke="#999" stroke-dasharray="3 3"/>
+  <text class="name" x="70" y="436" text-anchor="middle" style="font-size:13px">tomlc17</text>
+  <text class="desc" x="70" y="454" text-anchor="middle">第三方 TOML</text>
+  <rect class="box" x="975" y="415" width="100" height="50" rx="6" stroke="#999" stroke-dasharray="3 3"/>
+  <text class="name" x="1025" y="436" text-anchor="middle" style="font-size:13px">libpng</text>
+  <text class="desc" x="1025" y="454" text-anchor="middle">PNG 编码</text>
+
+  <!-- group: foundation -->
+  <rect x="150" y="390" width="790" height="92" rx="8" fill="#f4f4f4" stroke="#888" stroke-dasharray="6 4"/>
+  <text class="group" x="162" y="408" fill="#666">基础模块</text>
+  <rect class="box" x="165" y="418" width="130" height="52" rx="6" stroke="#888"/>
+  <text class="name" x="230" y="440" text-anchor="middle">geometry</text>
+  <text class="desc" x="230" y="459" text-anchor="middle">形状</text>
+  <rect class="box" x="322" y="418" width="130" height="52" rx="6" stroke="#888"/>
+  <text class="name" x="387" y="440" text-anchor="middle">medium</text>
+  <text class="desc" x="387" y="459" text-anchor="middle">介质参数</text>
+  <rect class="box" x="480" y="418" width="130" height="52" rx="6" stroke="#888"/>
+  <text class="name" x="545" y="440" text-anchor="middle">waveform</text>
+  <text class="desc" x="545" y="459" text-anchor="middle">声源时间函数</text>
+  <rect class="box" x="637" y="418" width="130" height="52" rx="6" stroke="#888"/>
+  <text class="name" x="702" y="440" text-anchor="middle">boundary</text>
+  <text class="desc" x="702" y="459" text-anchor="middle">边界与 PML</text>
+  <rect class="box" x="795" y="418" width="130" height="52" rx="6" stroke="#888"/>
+  <text class="name" x="860" y="440" text-anchor="middle">grid</text>
+  <text class="desc" x="860" y="459" text-anchor="middle">网格布局与索引</text>
+
+  <!-- common -->
+  <path class="dep" d="M545,482 V520"/>
+  <rect class="box" x="445" y="520" width="200" height="50" rx="6" stroke="#333" style="fill:#ececec"/>
+  <text class="name" x="545" y="541" text-anchor="middle">common</text>
+  <text class="desc" x="545" y="560" text-anchor="middle">错误信息 · 警告 · 内存分配</text>
+
+  <!-- legend -->
+  <line x1="40" y1="608" x2="90" y2="608" class="dep"/>
+  <text class="note" x="100" y="612">调用 / 依赖</text>
+  <line x1="200" y1="608" x2="250" y2="608" class="data"/>
+  <text class="note" x="260" y="612">数据流（由 main.c 在模块之间传递）</text>
+  <rect x="500" y="599" width="40" height="18" rx="4" fill="#f4f4f4" stroke="#888" stroke-dasharray="6 4"/>
+  <text class="note" x="550" y="612">模块分组</text>
+  <text class="note" x="40" y="640">所有模块都依赖 common。render 只依赖 common 和 libpng，不依赖 model 和 solver。</text>
+</svg>

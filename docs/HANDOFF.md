@@ -26,8 +26,11 @@
 
 Git：仓库由用户的 IDE（CLion）初始化，分支为 `master`，没有远程仓库。
 - 首次提交 `3ea6b88`：核心模块、解析器、求解器、命令行、测试、示例和文档；渲染器为占位代码。
+- `2aeb585` “REV-1.0”（用户提交）：求解器、渲染器、signal → waveform 改名、防御性检查清理。
+- `bf2ad45` “Minor Update”（用户提交）：所有头文件从 `src/` 移到 `headers/`，CMake 用 `target_include_directories(fdtd2d_core PUBLIC src headers)`。
+- 未提交：`docs/images/modules.svg`、`docs/theory.md`、`docs/manual.md`，以及 `docs/api/README.md` 的修改（含用户自己的改动）。
 - `.gitignore` 忽略 `build*/`、`cmake-build-*/`、`.idea/` 和 `output/`。
-- 用户没要求时不提交，也不推送。
+- 提交由用户自己做；用户没要求时不提交，也不推送。
 
 用户已确认：`examples/*.toml` 的配置格式认可；文档中文、代码注释英文保持不变。
 
@@ -103,18 +106,18 @@ CTest 中的测试：
 
 | 模块 | 文件 | 状态 | API 文档 | 用户检查 |
 |---|---|---|---|---|
-| common | `src/common.[ch]` | ✅ 完成 | `docs/api/common.md` | 已提交（检查点 1），待确认 |
-| geometry | `src/geometry.[ch]` | ✅ 完成，`test_geometry` 17/17 | `geometry.md` | 检查点 1，待确认 |
-| grid | `src/grid.h` | ✅ 完成 | `grid.md` | 检查点 1，待确认 |
-| medium | `src/medium.[ch]` | ✅ 完成 | `medium.md` | 检查点 1，待确认 |
-| waveform（原 signal） | `src/waveform.[ch]` | ✅ 完成 | `waveform.md` | 检查点 1，待确认 |
-| boundary | `src/boundary.[ch]` | ✅ 完成 | `boundary.md` | 检查点 1，待确认 |
-| **解析器** config | `src/config.[ch]` | ✅ 完成，`test_config` 42/42 | `config.md` | **检查点 2：待复审通过后提交** |
-| **解析器** source | `src/source.[ch]` | ✅ 完成，`test_source` 18/18（防御清理后） | `source.md` | 检查点 2 |
-| **解析器** model | `src/model.[ch]` | ✅ 完成，`test_model` 17/17 | `model.md` | 检查点 2 |
-| 求解器 solver | `src/solver.[ch]` | ✅ 审查意见已修复，`test_solver` 22/22，ASan 通过 | `solver.md` | **检查点 3，已提交给用户** |
-| 渲染器 render | `src/render.[ch]` | ✅ 审查 APPROVE，Minor 已修，`test_render` 21/21（防御清理后），ASan 通过 | `render.md` | **检查点 4，已提交给用户** |
-| 命令行 | `src/main.c` | ✅ 两个示例端到端跑通（Release 和 ASan）。新增：模型构建后、写任何文件前检查帧尺寸是否超过 65535 | 待写（README 或 cli.md） | 未提交 |
+| common | `headers/common.h`、`src/common.c` | ✅ 完成 | `docs/api/common.md` | 已提交（检查点 1），待确认 |
+| geometry | `headers/geometry.h`、`src/geometry.c` | ✅ 完成，`test_geometry` 17/17 | `geometry.md` | 检查点 1，待确认 |
+| grid | `headers/grid.h` | ✅ 完成 | `grid.md` | 检查点 1，待确认 |
+| medium | `headers/medium.h`、`src/medium.c` | ✅ 完成 | `medium.md` | 检查点 1，待确认 |
+| waveform（原 signal） | `headers/waveform.h`、`src/waveform.c` | ✅ 完成 | `waveform.md` | 检查点 1，待确认 |
+| boundary | `headers/boundary.h`、`src/boundary.c` | ✅ 完成 | `boundary.md` | 检查点 1，待确认 |
+| **解析器** config | `headers/config.h`、`src/config.c` | ✅ 完成，`test_config` 42/42 | `config.md` | **检查点 2：待复审通过后提交** |
+| **解析器** source | `headers/source.h`、`src/source.c` | ✅ 完成，`test_source` 18/18（防御清理后） | `source.md` | 检查点 2 |
+| **解析器** model | `headers/model.h`、`src/model.c` | ✅ 完成，`test_model` 17/17 | `model.md` | 检查点 2 |
+| 求解器 solver | `headers/solver.h`、`src/solver.c` | ✅ 审查意见已修复，`test_solver` 22/22，ASan 通过 | `solver.md` | **检查点 3，已提交给用户** |
+| 渲染器 render | `headers/render.h`、`src/render.c` | ✅ 审查 APPROVE，Minor 已修，`test_render` 21/21（防御清理后），ASan 通过 | `render.md` | **检查点 4，已提交给用户** |
+| 命令行 | `src/main.c` | ✅ 两个示例端到端跑通（Release 和 ASan）。新增：模型构建后、写任何文件前检查帧尺寸是否超过 65535 | `docs/manual.md` | 已提交（REV-1.0） |
 | 验证测试 | `tests/test_validation.c` | ⏳ 占位，还没写 | — | — |
 
 求解器审查 `review-solver1` 的问题：
@@ -174,20 +177,17 @@ CTest 中的测试：
 
 ## 6. 下一步
 
-1. 收集上面三个后台任务的结果，**亲自检查**代码和测试结果，不只看子代理的总结。
-2. 解析器复审通过后，提交给用户检查（检查点 2）。
-3. 求解器：独立审查，确认没有 Critical 或 Major 问题。然后写 `docs/api/solver.md`，内容包括离散格式、边界实现、PML 系数、能量函数和性能数据，再提交给用户检查。
-4. 渲染器：同样的流程，文档为 `docs/api/render.md`。
-5. 集成：
-   - 端到端运行两个示例，查看 PNG；
+已完成：模块图 `docs/images/modules.svg`（替换 `docs/api/README.md` 的 ASCII 图）、原理说明 `docs/theory.md`、使用手册 `docs/manual.md`（命令行、退出码、FAQ 报错文本均已实际运行核对）。
+
+待办：
+1. `docs/api/*.md` 头部仍写 `src/*.h`，头文件已移到 `headers/`，等用户确认后批量修正。
+2. 待用户确认后：
    - 写 `tests/test_validation.c`，验证项包括：
      - 自由场点源与 `(ωρQ/4)·H₀⁽²⁾(kr)` 比较，用 glibc 的 `j0`/`y0`；
      - 两侧刚性壁之间的线源产生平面波，幅值为 `ρcQ′/2`；
      - 刚性壁和压力释放壁的镜像源解；
      - 小域加 PML 与大域参考解比较，检验 PML 反射。
-   - 写命令行文档；
    - 做最终验证和审查。
-6. 还要问用户：是否 `git init`；配置格式是否认可；文档语言是否统一。
 
 ## 7. 关键设计约定（速查）
 
