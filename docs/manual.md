@@ -6,7 +6,7 @@ fdtd2d 是用 C11 写的二维声学 FDTD 仿真器。它计算二维声压场�
 
 ## 构建
 
-前提：C11 编译器、CMake 3.20 或更高版本、libpng 开发包（同时需要 libm）。tomlc17 已随源码提供，无需安装。当前只支持 POSIX 系统。默认构建类型是 Release，可执行文件为 `build/fdtd2d`。
+前提：C11 编译器、CMake 3.20 或更高版本、libpng 开发包（同时需要 libm）。tomlc17 已随源码提供，无需安装。当前只支持 POSIX 系统。默认构建类型是 Release，可执行文件为 `../build/fdtd2d`。
 
 ```sh
 cmake -S . -B build
@@ -28,7 +28,7 @@ ctest --test-dir build
 ./build/fdtd2d --check examples/point_source_free_field.toml
 ```
 
-摘要如下（`docs/api/model.md` 中的实际输出，有删节）：
+摘要如下（`api/model.md` 中的实际输出，有删节）：
 
 ```
 grid:  400 x 300 cells physical, 440 x 340 cells total (incl. PML)
@@ -44,7 +44,7 @@ sources: 1
 ./build/fdtd2d examples/point_source_free_field.toml
 ```
 
-输出写入示例的 `[output].directory`，即 `out/point_source_free_field`。另一个示例 `examples/line_source_obstacles.toml` 含线源和障碍物，输出到 `out/line_source_obstacles`。
+输出写入示例的 `[output].directory`，即 `out/point_source_free_field`。另一个示例 `../examples/line_source_obstacles.toml` 含线源和障碍物，输出到 `out/line_source_obstacles`。
 
 ## 命令行
 
@@ -185,4 +185,4 @@ signal = { type = "harmonic", frequency = 2000.0, amplitude = 2e-3 }
 ## 链接
 
 - [theory.md](theory.md)：理论说明
-- [api/README.md](api/README.md)：模块文档总览
+- [api/README.md](api/DEV.md)：模块文档总览

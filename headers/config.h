@@ -4,7 +4,7 @@
  * SimConfig holds exactly what the user wrote (plus defaults); it knows
  * nothing about the grid. Cross-field checks that need the grid (domain
  * divisibility, CFL limit, source inside domain, ...) belong to
- * model_build(). See the files in examples/ and README.md for the format.
+ * model_build(). See the files in examples/ and DEV.md for the format.
  */
 #ifndef FDTD2D_CONFIG_H
 #define FDTD2D_CONFIG_H

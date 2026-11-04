@@ -28,7 +28,7 @@ Git：仓库由用户的 IDE（CLion）初始化，分支为 `master`，没有�
 - 首次提交 `3ea6b88`：核心模块、解析器、求解器、命令行、测试、示例和文档；渲染器为占位代码。
 - `2aeb585` “REV-1.0”（用户提交）：求解器、渲染器、signal → waveform 改名、防御性检查清理。
 - `bf2ad45` “Minor Update”（用户提交）：所有头文件从 `src/` 移到 `headers/`，CMake 用 `target_include_directories(fdtd2d_core PUBLIC src headers)`。
-- 未提交：`docs/images/modules.svg`、`docs/theory.md`、`docs/manual.md`，以及 `docs/api/README.md` 的修改（含用户自己的改动）。
+- 未提交：`docs/images/modules.svg`、`docs/theory.md`、`manual.md`，以及 `api/DEV.md` 的修改（含用户自己的改动）。
 - `.gitignore` 忽略 `build*/`、`cmake-build-*/`、`.idea/` 和 `output/`。
 - 提交由用户自己做；用户没要求时不提交，也不推送。
 
@@ -117,7 +117,7 @@ CTest 中的测试：
 | **解析器** model | `headers/model.h`、`src/model.c` | ✅ 完成，`test_model` 17/17 | `model.md` | 检查点 2 |
 | 求解器 solver | `headers/solver.h`、`src/solver.c` | ✅ 审查意见已修复，`test_solver` 22/22，ASan 通过 | `solver.md` | **检查点 3，已提交给用户** |
 | 渲染器 render | `headers/render.h`、`src/render.c` | ✅ 审查 APPROVE，Minor 已修，`test_render` 21/21（防御清理后），ASan 通过 | `render.md` | **检查点 4，已提交给用户** |
-| 命令行 | `src/main.c` | ✅ 两个示例端到端跑通（Release 和 ASan）。新增：模型构建后、写任何文件前检查帧尺寸是否超过 65535 | `docs/manual.md` | 已提交（REV-1.0） |
+| 命令行 | `src/main.c` | ✅ 两个示例端到端跑通（Release 和 ASan）。新增：模型构建后、写任何文件前检查帧尺寸是否超过 65535 | `manual.md` | 已提交（REV-1.0） |
 | 验证测试 | `tests/test_validation.c` | ⏳ 占位，还没写 | — | — |
 
 求解器审查 `review-solver1` 的问题：
@@ -177,7 +177,7 @@ CTest 中的测试：
 
 ## 6. 下一步
 
-已完成：模块图 `docs/images/modules.svg`（替换 `docs/api/README.md` 的 ASCII 图）、原理说明 `docs/theory.md`、使用手册 `docs/manual.md`（命令行、退出码、FAQ 报错文本均已实际运行核对）。
+已完成：模块图 `docs/images/modules.svg`（替换 `api/DEV.md` 的 ASCII 图）、原理说明 `docs/theory.md`、使用手册 `manual.md`（命令行、退出码、FAQ 报错文本均已实际运行核对）。
 
 待办：
 1. `docs/api/*.md` 头部仍写 `src/*.h`，头文件已移到 `headers/`，等用户确认后批量修正。

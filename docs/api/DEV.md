@@ -10,17 +10,17 @@ fdtd2d 是一个 C11 编写的二维声场 FDTD 仿真工具：无黏性理想�
 
 | 模块 | 头文件 / 实现 | 作用 | 文档 |
 |---|---|---|---|
-| common | `headers/common.h`、`src/common.c` | 错误信息、警告、内存分配辅助 | [common.md](common.md) |
-| geometry | `headers/geometry.h`、`src/geometry.c` | 与网格无关的二维形状 | [geometry.md](geometry.md) |
-| grid | `headers/grid.h` | 交错网格布局与索引换算（仅头文件） | [grid.md](grid.md) |
-| medium | `headers/medium.h`、`src/medium.c` | 介质参数与介质表 | [medium.md](medium.md) |
-| waveform | `headers/waveform.h`、`src/waveform.c` | 声源时间函数（v1：简谐） | [waveform.md](waveform.md) |
-| boundary | `headers/boundary.h`、`src/boundary.c` | 外边界类型与 PML 参数 | [boundary.md](boundary.md) |
-| config | `headers/config.h`、`src/config.c` | 解析器第一层：TOML → `SimConfig` | [config.md](config.md) |
-| source | `headers/source.h`、`src/source.c` | 声源空间离散 | [source.md](source.md) |
-| model | `headers/model.h`、`src/model.c` | 解析器第二层：`SimConfig` → 网格模型 | [model.md](model.md) |
-| solver | `headers/solver.h`、`src/solver.c` | FDTD 时间推进 | [solver.md](solver.md) |
-| render | `headers/render.h`、`src/render.c` | 热力图 PNG 输出 | [render.md](render.md) |
+| common | `../../headers/common.h`、`src/common.c` | 错误信息、警告、内存分配辅助 | [common.md](common.md) |
+| geometry | `../../headers/geometry.h`、`src/geometry.c` | 与网格无关的二维形状 | [geometry.md](geometry.md) |
+| grid | `../../headers/grid.h` | 交错网格布局与索引换算（仅头文件） | [grid.md](grid.md) |
+| medium | `../../headers/medium.h`、`src/medium.c` | 介质参数与介质表 | [medium.md](medium.md) |
+| waveform | `../../headers/waveform.h`、`src/waveform.c` | 声源时间函数（v1：简谐） | [waveform.md](waveform.md) |
+| boundary | `../../headers/boundary.h`、`src/boundary.c` | 外边界类型与 PML 参数 | [boundary.md](boundary.md) |
+| config | `../../headers/config.h`、`src/config.c` | 解析器第一层：TOML → `SimConfig` | [config.md](config.md) |
+| source | `../../headers/source.h`、`src/source.c` | 声源空间离散 | [source.md](source.md) |
+| model | `../../headers/model.h`、`src/model.c` | 解析器第二层：`SimConfig` → 网格模型 | [model.md](model.md) |
+| solver | `../../headers/solver.h`、`src/solver.c` | FDTD 时间推进 | [solver.md](solver.md) |
+| render | `../../headers/render.h`、`src/render.c` | 热力图 PNG 输出 | [render.md](render.md) |
 
 依赖只能自上而下：基础模块互不依赖（只依赖 common），renderer 不依赖 model，也不依赖 solver。
 
@@ -59,4 +59,4 @@ CMake 选项：
 | `FDTD2D_WERROR` | OFF | 把编译警告视为错误 |
 | `FDTD2D_SANITIZE` | OFF | 启用 AddressSanitizer 与 UBSan |
 
-链接目标：`fdtd2d_core`（静态库，包含全部模块）、`fdtd2d`（命令行程序）、`tomlc17`（第三方 TOML 解析库，见 `third_party/tomlc17/VERSION.txt`）。
+链接目标：`fdtd2d_core`（静态库，包含全部模块）、`fdtd2d`（命令行程序）、`tomlc17`（第三方 TOML 解析库，见 `../../third_party/tomlc17/VERSION.txt`）。
