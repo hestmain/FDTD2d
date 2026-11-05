@@ -20,7 +20,9 @@
 空间导数用二阶中心差分。每个差分跨过一个单元或一个面，p 的梯度落在面上，v 的散度落在单元中心，不需要插值。
 
 时间用 leapfrog：p 在整数时刻 t_n = n·dt，v 在半整数时刻 t_{n+½}，交替更新。无阻尼、无声源时的更新为：
-
+$$v_x^{n+½}(i,j) = v_x^{n−½}(i,j) − \frac{dt}{\rho_{face}} \frac{( p^n(i,j) − p^n(i−1,j) )}{dx} $$
+$$v_y^{n+½}(i,j) = v_y^{n−½}(i,j) − \frac{dt}{\rho_{face}} \frac{( p^n(i,j) − p^n(i,j-1))}{dx} $$
+$$p^{n+1}(i,j) = p^n(i,j) − K·dt [ \frac{v_x^{n+1/2}(i+1,j) − v_x^{n+1/2}(i,j)}{dx} + \frac{ v_y^{n+1/2}(i,j+1) − v_y^{n+1/2}(i,j) }{dy}]$$
 ```
 vx^{n+½}(i,j) = vx^{n−½}(i,j) − dt/ρ_face · ( p^n(i,j) − p^n(i−1,j) ) / dx
 vy^{n+½}(i,j) = vy^{n−½}(i,j) − dt/ρ_face · ( p^n(i,j) − p^n(i,j−1) ) / dy
