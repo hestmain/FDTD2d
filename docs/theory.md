@@ -5,11 +5,9 @@
 ## 1 物理模型
 
 介质是静止的无黏性理想流体，声波是小扰动，方程线性化。未知量是声压 p 和质点速度 v = (vx, vy)。一阶方程组由连续性方程和欧拉方程组成：
-
-```
-∂p/∂t = −K ∇·v + K·q          K = ρc²
-∂v/∂t = −(1/ρ) ∇p
-```
+$$\frac{\partial p}{\partial t} = −K \nabla \cdot v + K \cdot q$$
+$$K = \rho c^2$$
+$$\frac{\partial v} {\partial t} =- \frac{1}{\rho} \nabla p$$
 
 ρ 是密度，c 是声速，K 是体积模量，q 是声源项（第 5 节）。二维指所有量沿 z 方向不变，因此体积、能量和声源强度都按单位深度计：声能单位是 J/m，点源强度 Q 的单位是 m²/s。
 
@@ -20,44 +18,31 @@
 空间导数用二阶中心差分。每个差分跨过一个单元或一个面，p 的梯度落在面上，v 的散度落在单元中心，不需要插值。
 
 时间用 leapfrog：p 在整数时刻 t_n = n·dt，v 在半整数时刻 t_{n+½}，交替更新。无阻尼、无声源时的更新为：
-$$v_x^{n+½}(i,j) = v_x^{n−½}(i,j) − \frac{dt}{\rho_{face}} \frac{( p^n(i,j) − p^n(i−1,j) )}{dx} $$
-$$v_y^{n+½}(i,j) = v_y^{n−½}(i,j) − \frac{dt}{\rho_{face}} \frac{( p^n(i,j) − p^n(i,j-1))}{dx} $$
-$$p^{n+1}(i,j) = p^n(i,j) − K·dt [ \frac{v_x^{n+1/2}(i+1,j) − v_x^{n+1/2}(i,j)}{dx} + \frac{ v_y^{n+1/2}(i,j+1) − v_y^{n+1/2}(i,j) }{dy}]$$
-```
-vx^{n+½}(i,j) = vx^{n−½}(i,j) − dt/ρ_face · ( p^n(i,j) − p^n(i−1,j) ) / dx
-vy^{n+½}(i,j) = vy^{n−½}(i,j) − dt/ρ_face · ( p^n(i,j) − p^n(i,j−1) ) / dy
-
-p^{n+1}(i,j) = p^n(i,j) − K·dt · [ ( vx(i+1,j) − vx(i,j) ) / dx
-                                 + ( vy(i,j+1) − vy(i,j) ) / dy ]
-```
+$$v_x^{n+\frac{1}{2}}(i,j) = v_x^{n−\frac{1}{2}}(i,j) − \frac{dt}{\rho_{face}} \frac{( p^n(i,j) − p^n(i−1,j) )}{dx} $$
+$$v_y^{n+\frac{1}{2}}(i,j) = v_y^{n−\frac{1}{2}}(i,j) − \frac{dt}{\rho_{face}} \frac{( p^n(i,j) − p^n(i,j-1))}{dx} $$
+$$p^{n+1}(i,j) = p^n(i,j) − K·dt [ \frac{v_x^{n+\frac{1}{2}}(i+1,j) − v_x^{n+\frac{1}{2}}(i,j)}{dx} + \frac{ v_y^{n+\frac{1}{2}}(i,j+1) − v_y^{n+\frac{1}{2}}(i,j) }{dy}]$$
 
 后一式中的 v 取 v^{n+½}。ρ_face 是面两侧单元密度的算术平均。代码把 p 拆成 px + py 两个分量以实现 PML，σ = 0 时拆分不改变结果。
 
 ## 3 稳定性与精度
 
 显式 leapfrog 在二维交错网格上稳定的条件是：
+$$cfl = c·dt·\sqrt{\frac{1}{dx^2} + \frac{1}{dy^2}} ≤ 1$$
+c 取介质表中的最大声速。未指定 `dt` 时，model 按 `cfl`（默认 0.7）反算 $dt = \frac{cfl}{c·\sqrt{\frac{1}{dx^2} + \frac{1}{dy^2}}}$。指定了 `dt` 且 cfl > 1 时，`model_build` 报错。solver 自己不检查这个条件。
 
-```
-cfl = c·dt·√(1/dx² + 1/dy²) ≤ 1
-```
-
-c 取介质表中的最大声速。未指定 `dt` 时，model 按 `cfl`（默认 0.7）反算 `dt = cfl / (c·√(1/dx² + 1/dy²))`。指定了 `dt` 且 cfl > 1 时，`model_build` 报错。solver 自己不检查这个条件。
-
-数值色散随每波长点数减少而增大。model 按 `c_min / (f_max · max(dx, dy))` 估计每波长点数，f_max 是所有声源的最高频率。低于 10（`MODEL_MIN_POINTS_PER_WAVELENGTH`）时输出警告：
+数值色散随每波长点数减少而增大。model 按 $$ \frac{c_{min}}{f_{max}\cdot max(dx, dy)}$$估计每波长点数，f_max 是所有声源的最高频率。低于 10（`MODEL_MIN_POINTS_PER_WAVELENGTH`）时输出警告：
 
 ```
 only %.2f points per wavelength at %g Hz (recommended >= 10); reduce dx/dy or the source frequency
 ```
 
-警告不中止运行。10 是经验值，不是误差界。
-
-测试中的实测值：空气（ρ = 1.21 kg/m³，c = 343 m/s）、dx = 1 cm、cfl = 0.7、1500 Hz（约 23 点/波长，由这些参数算出）时，沿 x 轴的相位延迟相对误差为 0.3 %，对角线方向为 0.14 %。这些数值只对该分辨率成立，换分辨率后误差会变。其余算例见 [solver.md](api/solver.md) 的“验证”。
+测试中的实测值：空气（ρ = 1.21 kg/m³，c = 343 m/s）、dx = 1 cm、cfl = 0.7、1500 Hz时，沿 x 轴的相位延迟相对误差为 0.3 %，对角线方向为 0.14 %。其余算例见 [solver.md](api/solver.md) 的“验证”。
 
 ## 4 边界
 
-**刚性**（`rigid`）：最外侧面上法向速度 v = 0。
+**刚性/绝对硬边界**（`rigid`）：最外侧面上法向速度 v = 0。
 
-**压力释放**（`pressure_release`）：边界上 p = 0。在最外侧面外放一个镜像虚单元，取反对称 `p_ghost = −p_inside`。虚单元中心与内部单元中心分处面两侧，各距面 dx/2，p = 0 的平面正好落在面上。
+**压力释放/绝对软边界**（`pressure_release`）：边界上 p = 0。在最外侧面外放一个镜像虚单元，取反对称 `p_ghost = −p_inside`。虚单元中心与内部单元中心分处面两侧，各距面 dx/2，p = 0 的平面正好落在面上。
 
 **固体单元**：障碍物形状覆盖单元中心的单元记为固体单元，边界按单元呈阶梯状。固体单元内 p = 0，与它相邻的面上 v = 0。这两条规则编进了系数，时间循环里没有针对固体的分支。
 
@@ -85,13 +70,10 @@ PML 的最外侧面是刚性壁：波穿过 PML，被最外缘反射，再穿回
 
 ## 5 声源
 
-声源是软源，以单极子体积注入的形式加到压力方程的源项里，而不是直接设定压力，因此波经过声源位置时不会被反射。每步在 t_{n+½} 对每个声源单元 c 做：
+声源是软源，以单极子体积注入的形式加到压力方程的源项里，而不是直接设定压力，因此波经过声源位置时不会被反射。每步在 $t_{n+\frac{1}{2}}$  对每个声源单元 c 做：
+$$p_c  +=  K·dt \cdot w_c \cdot s(t_{n+\frac{1}{2}})$$
 
-```
-p_c += K·dt · w_c · s(t_{n+½})
-```
-
-实现中增量平分给 px 和 py。w_c 是空间权重，s(t) 是时间函数。
+实现中增量平分给 $p_x$ 和 $p_y$ ；$w_c$ 是空间权重，$s(t)$ 是时间函数。
 
 - 点源：权重按双线性分配到最近的 4 个单元中心，Σ w·dx·dy = 1。幅值 A 是单位深度的体积速度 Q，单位 m²/s。
 - 线源（直线段）：权重取线段落在各单元内的长度，Σ w·dx·dy = 线段长度。幅值 A 是单位长度、单位深度的体积速度 Q′，单位 m/s。

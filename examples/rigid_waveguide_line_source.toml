@@ -1,0 +1,44 @@
+# Rigid-walled waveguide (duct) driven at its closed end x = 0 by a harmonic
+# line source spanning the full height. The source is uniform in y, so it
+# excites only the plane mode; the far end x = 3 m is anechoic (PML).
+#
+# Expected steady-state amplitude (rigid end doubles the one-sided plane wave
+# rho*c*Q'/2), up to O((k dx)^2):
+#   |p| = rho * c * Q' = 1.21 * 343 * 2.4e-3 = 0.996 Pa
+# First higher mode cut-off c / (2 h) = 571.7 Hz (not excited here anyway).
+#
+# Run:  fdtd2d examples/rigid_waveguide_line_source.toml
+
+[simulation]
+duration = 0.04           # [s] wave reaches x = 3 m after 8.7 ms; steady from ~15 ms
+cfl      = 0.7
+
+[grid]
+x_range = [0.0, 3.0]      # [m] duct length
+y_range = [0.0, 0.3]      # [m] duct height h
+dx      = 0.01            # [m] 68.6 points per wavelength at 500 Hz
+
+[medium]
+density = 1.21            # [kg/m^3]
+c       = 343.0           # [m/s]
+
+[boundary]
+x_min = "rigid"           # closed end, source sits on it
+x_max = "pml"             # anechoic termination
+y_min = "rigid"           # duct walls
+y_max = "rigid"
+
+[boundary.pml]
+thickness = 20
+
+[[source]]
+# Full-height line source on the closed end; amplitude is Q' [m/s].
+shape  = { type = "segment", start = [0.0, 0.0], end = [0.0, 0.3] }
+signal = { type = "harmonic", frequency = 500.0, amplitude = 2.4e-3, ramp_cycles = 3 }
+
+[output]
+directory   = "out/rigid_waveguide_line_source"
+every       = 40
+color_limit = 1.2         # [Pa] fixed, frames are comparable
+pixel_scale = 3
+show_pml    = true

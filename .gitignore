@@ -8,3 +8,6 @@
 
 # Simulation output
 /output/
+.openbitfun/
+/docs/HANDOFF.md 
+/out/
