@@ -30,6 +30,7 @@ typedef struct CliOptions {
 
 static void print_usage(FILE *out)
 {
+    // TODO: Add interactive -i mode
     fputs("usage: fdtd2d [options] CONFIG.toml\n"
           "\n"
           "Run a 2D acoustic FDTD simulation described by a TOML file and write\n"
@@ -49,6 +50,7 @@ static void print_usage(FILE *out)
 static int parse_args(int argc, char **argv, CliOptions *o)
 {
     memset(o, 0, sizeof *o);
+    //Extract each command line args and evaluate
     for (int k = 1; k < argc; k++) {
         const char *a = argv[k];
         if (strcmp(a, "--check") == 0) {

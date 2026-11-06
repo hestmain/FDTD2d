@@ -5,9 +5,17 @@
 ## 1 物理模型
 
 介质是静止的无黏性理想流体，声波是小扰动，方程线性化。未知量是声压 p 和质点速度 v = (vx, vy)。一阶方程组由连续性方程和欧拉方程组成：
-$$\frac{\partial p}{\partial t} = −K \nabla \cdot v + K \cdot q$$
-$$K = \rho c^2$$
-$$\frac{\partial v} {\partial t} =- \frac{1}{\rho} \nabla p$$
+$$
+\frac{\partial p}{\partial t} = −K \nabla \cdot v + K \cdot q
+$$
+
+$$
+K = \rho c^2
+$$
+
+$$
+\frac{\partial v} {\partial t} =- \frac{1}{\rho} \nabla p
+$$
 
 ρ 是密度，c 是声速，K 是体积模量，q 是声源项（第 5 节）。二维指所有量沿 z 方向不变，因此体积、能量和声源强度都按单位深度计：声能单位是 J/m，点源强度 Q 的单位是 m²/s。
 
@@ -18,16 +26,26 @@ $$\frac{\partial v} {\partial t} =- \frac{1}{\rho} \nabla p$$
 空间导数用二阶中心差分。每个差分跨过一个单元或一个面，p 的梯度落在面上，v 的散度落在单元中心，不需要插值。
 
 时间用 leapfrog：p 在整数时刻 t_n = n·dt，v 在半整数时刻 t_{n+½}，交替更新。无阻尼、无声源时的更新为：
-$$v_x^{n+\frac{1}{2}}(i,j) = v_x^{n−\frac{1}{2}}(i,j) − \frac{dt}{\rho_{face}} \frac{( p^n(i,j) − p^n(i−1,j) )}{dx} $$
-$$v_y^{n+\frac{1}{2}}(i,j) = v_y^{n−\frac{1}{2}}(i,j) − \frac{dt}{\rho_{face}} \frac{( p^n(i,j) − p^n(i,j-1))}{dx} $$
-$$p^{n+1}(i,j) = p^n(i,j) − K·dt [ \frac{v_x^{n+\frac{1}{2}}(i+1,j) − v_x^{n+\frac{1}{2}}(i,j)}{dx} + \frac{ v_y^{n+\frac{1}{2}}(i,j+1) − v_y^{n+\frac{1}{2}}(i,j) }{dy}]$$
+$$
+v_x^{n+\frac{1}{2}}(i,j) = v_x^{n−\frac{1}{2}}(i,j) − \frac{dt}{\rho_{face}} \frac{( p^n(i,j) − p^n(i−1,j) )}{dx}
+$$
+
+$$
+v_y^{n+\frac{1}{2}}(i,j) = v_y^{n−\frac{1}{2}}(i,j) − \frac{dt}{\rho_{face}} \frac{( p^n(i,j) − p^n(i,j-1))}{dx} 
+$$
+
+$$
+p^{n+1}(i,j) = p^n(i,j) − K·dt [ \frac{v_x^{n+\frac{1}{2}}(i+1,j) − v_x^{n+\frac{1}{2}}(i,j)}{dx} + \frac{ v_y^{n+\frac{1}{2}}(i,j+1) − v_y^{n+\frac{1}{2}}(i,j) }{dy}]
+$$
 
 后一式中的 v 取 v^{n+½}。ρ_face 是面两侧单元密度的算术平均。代码把 p 拆成 px + py 两个分量以实现 PML，σ = 0 时拆分不改变结果。
 
 ## 3 稳定性与精度
 
 显式 leapfrog 在二维交错网格上稳定的条件是：
-$$cfl = c·dt·\sqrt{\frac{1}{dx^2} + \frac{1}{dy^2}} ≤ 1$$
+$$
+cfl = c·dt·\sqrt{\frac{1}{dx^2} + \frac{1}{dy^2}} ≤ 1
+$$
 c 取介质表中的最大声速。未指定 `dt` 时，model 按 `cfl`（默认 0.7）反算 $dt = \frac{cfl}{c·\sqrt{\frac{1}{dx^2} + \frac{1}{dy^2}}}$。指定了 `dt` 且 cfl > 1 时，`model_build` 报错。solver 自己不检查这个条件。
 
 数值色散随每波长点数减少而增大。model 按 $$ \frac{c_{min}}{f_{max}\cdot max(dx, dy)}$$估计每波长点数，f_max 是所有声源的最高频率。低于 10（`MODEL_MIN_POINTS_PER_WAVELENGTH`）时输出警告：
@@ -88,8 +106,6 @@ T_r = ramp_cycles / f
 
 `ramp_cycles` 默认 3，设为 0 则不渐变。
 
-参考解：二维自由场中简谐点源（`e^{iωt}` 约定）的远场为 `p(r) = (ωρQ/4) · H₀⁽²⁾(kr)`。用它校核幅值的测试尚未实现，是计划项。
-
 ## 6 验证现状
 
 下列结果来自 `tests/test_solver.c`（空气，dx = 1 cm，cfl = 0.7），完整数据见 [solver.md](api/solver.md) 的“验证”。
@@ -112,4 +128,3 @@ T_r = ramp_cycles / f
 - [source.md](api/source.md)：声源离散的细节和错误条件。
 - [model.md](api/model.md)：网格、时间步长、步数和每波长点数检查。
 - [boundary.md](api/boundary.md)：边界类型和 PML 参数的取值范围。
-- [manual.md](manual.md)：使用手册。

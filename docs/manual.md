@@ -185,4 +185,4 @@ signal = { type = "harmonic", frequency = 2000.0, amplitude = 2e-3 }
 ## 链接
 
 - [theory.md](theory.md)：理论说明
-- [api/README.md](api/DEV.md)：模块文档总览
+- [api/DEV.md](DEV.md)：模块文档总览
