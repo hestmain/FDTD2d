@@ -26,8 +26,9 @@ $$
 空间导数用二阶中心差分。每个差分跨过一个单元或一个面，p 的梯度落在面上，v 的散度落在单元中心，不需要插值。
 
 时间用 leapfrog：p 在整数时刻 t_n = n·dt，v 在半整数时刻 t_{n+½}，交替更新。无阻尼、无声源时的更新为：
+
 $$
-v_x^{n+\frac{1}{2}}(i,j) = v_x^{n−\frac{1}{2}}(i,j) − \frac{dt}{\rho_{face}} \frac{( p^n(i,j) − p^n(i−1,j) )}{dx}
+v_x^{n+\frac{1}{2}}(i,j) = v_x^{n−\frac{1}{2}}(i,j) − \frac{dt}{\rho_{face}} \frac{( p^n(i,j) − p^n(i−1,j) )}{dx} 
 $$
 
 $$
